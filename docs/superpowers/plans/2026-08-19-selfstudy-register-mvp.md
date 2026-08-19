@@ -48,7 +48,7 @@ components/
     ScheduleGrid.tsx
     SlotCell.tsx
   booking/
-    BookingDialog.tsx
+    BookingDialog.tsx                 # accepts an `action` prop — reused as-is for admin book-on-behalf
     CancelDialog.tsx
   admin/
     BranchDeskManager.tsx
@@ -1506,7 +1506,8 @@ git push
 
 **Interfaces:**
 - Produces: `createRegistrationAction(input: CreateRegistrationInput): Promise<ActionResult<{ id: string }>>`
-- Consumes: `createRegistrationSchema` (Task 4), `createPublicClient` (Task 5), `SlotClickPayload` (Task 8).
+- Produces: `<BookingDialog action?={...} .../>` — the `action` prop defaults to `createRegistrationAction` but accepts any function matching `(input: unknown) => Promise<ActionResult<{ id: string }>>`. Task 14 reuses this exact component (no duplicate file) by passing `action={createRegistrationAsAdminAction}`.
+- Consumes: `createRegistrationSchema` (Task 4), `createPublicClient` (Task 5), `SlotClickPayload` (Task 8), `ActionResult` (Task 5).
 
 - [ ] **Step 1: Write `actions/registrations.ts`**
 
@@ -1587,13 +1588,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import type { ActionResult } from "@/types"
 
 export function BookingDialog({
   open, onOpenChange, deskId, deskLabel, date, startTime, endTime, onSuccess,
+  action = createRegistrationAction,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void
   deskId: string; deskLabel: string; date: string; startTime: string; endTime: string
   onSuccess: () => void
+  action?: (input: unknown) => Promise<ActionResult<{ id: string }>>
 }) {
   const [submitting, setSubmitting] = useState(false)
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CreateRegistrationInput>({
@@ -1603,7 +1607,7 @@ export function BookingDialog({
 
   async function onSubmit(values: CreateRegistrationInput) {
     setSubmitting(true)
-    const result = await createRegistrationAction(values)
+    const result = await action(values)
     setSubmitting(false)
     if (!result.ok) {
       toast.error(result.error)
@@ -2329,7 +2333,7 @@ git push
 ### Task 14: Internal read-only calendar + admin book-on-behalf
 
 **Files:**
-- Create: `app/noi-bo/lich/page.tsx`, `components/booking/AdminBookingDialog.tsx`, `components/schedule/InternalScheduleGridClient.tsx`
+- Create: `app/noi-bo/lich/page.tsx`, `components/schedule/InternalScheduleGridClient.tsx`
 - Modify: `actions/registrations.ts` (add `createRegistrationAsAdminAction`)
 
 **Interfaces:**
@@ -2373,11 +2377,9 @@ export async function createRegistrationAsAdminAction(input: unknown): Promise<A
 }
 ```
 
-- [ ] **Step 2: Write `components/booking/AdminBookingDialog.tsx`**
+- [ ] **Step 2: Write `components/schedule/InternalScheduleGridClient.tsx`**
 
-Copy `components/booking/BookingDialog.tsx` to `components/booking/AdminBookingDialog.tsx`, rename the exported component to `AdminBookingDialog`, and swap the `createRegistrationAction` import/call for `createRegistrationAsAdminAction`. Keep the same name+phone fields — admin still records who the seat is for, they just aren't re-verifying it's the same admin submitting.
-
-- [ ] **Step 3: Write `components/schedule/InternalScheduleGridClient.tsx`**
+Reuses `BookingDialog` from Task 9 unmodified, passing `action={createRegistrationAsAdminAction}` — no separate admin dialog component, no duplicated JSX/logic.
 
 ```tsx
 "use client"
@@ -2385,7 +2387,8 @@ Copy `components/booking/BookingDialog.tsx` to `components/booking/AdminBookingD
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ScheduleGrid, type SlotClickPayload } from "@/components/schedule/ScheduleGrid"
-import { AdminBookingDialog } from "@/components/booking/AdminBookingDialog"
+import { BookingDialog } from "@/components/booking/BookingDialog"
+import { createRegistrationAsAdminAction } from "@/actions/registrations"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 
 export function InternalScheduleGridClient({
@@ -2401,7 +2404,7 @@ export function InternalScheduleGridClient({
         onSlotClick={canBook ? setSelected : () => {}}
       />
       {canBook && selected && !selected.registration && (
-        <AdminBookingDialog
+        <BookingDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
           deskId={selected.desk.id}
@@ -2409,6 +2412,7 @@ export function InternalScheduleGridClient({
           date={selected.date}
           startTime={selected.startTime}
           endTime={selected.endTime}
+          action={createRegistrationAsAdminAction}
           onSuccess={() => router.refresh()}
         />
       )}
@@ -2419,7 +2423,7 @@ export function InternalScheduleGridClient({
 
 `quan_sinh` gets `canBook={false}`, so clicks are inert — matching "chỉ xem, không tạo/sửa/huỷ".
 
-- [ ] **Step 4: Write `app/noi-bo/lich/page.tsx`**
+- [ ] **Step 3: Write `app/noi-bo/lich/page.tsx`**
 
 ```tsx
 import { requireProfile } from "@/lib/auth"
@@ -2458,14 +2462,14 @@ export default async function InternalCalendarPage({
 }
 ```
 
-- [ ] **Step 5: Manual verification**
+- [ ] **Step 4: Manual verification**
 
 Log in as admin, visit `/noi-bo/lich`, click a free slot, register a student — expect it to appear both there and on the public `/` grid. Log in as a `quan_sinh` account (create one manually via Supabase Studio with `role='quan_sinh'` for this check) — expect clicking any cell to do nothing.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add app/noi-bo/lich components/booking/AdminBookingDialog.tsx components/schedule/InternalScheduleGridClient.tsx actions/registrations.ts
+git add app/noi-bo/lich components/schedule/InternalScheduleGridClient.tsx actions/registrations.ts
 git commit -m "feat: add internal read-only calendar with admin book-on-behalf"
 git push
 ```
