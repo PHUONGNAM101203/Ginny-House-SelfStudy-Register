@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config"
 import { config } from "dotenv"
+import path from "path"
 
 // Load .env.local (git-ignored) so `npm run test:integration` can pick up
 // NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY without requiring
@@ -9,5 +10,10 @@ import { config } from "dotenv"
 config({ path: ".env.local", quiet: true })
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "./"),
+    },
+  },
   test: {},
 })
