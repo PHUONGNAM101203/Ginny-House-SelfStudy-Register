@@ -11,7 +11,10 @@ export function AppHeader({ profile }: { profile: Profile }) {
           <Link href="/noi-bo/lich" className="text-sm text-muted-foreground">Lịch</Link>
           <Link href="/noi-bo/dashboard" className="text-sm text-muted-foreground">Dashboard</Link>
           {profile.role === "admin" && (
-            <Link href="/noi-bo/quan-ly/co-so" className="text-sm text-muted-foreground">Quản lý</Link>
+            <>
+              <Link href="/noi-bo/quan-ly/co-so" className="text-sm text-muted-foreground">Quản lý</Link>
+              <Link href="/noi-bo/quan-ly/khoa-lich" className="text-sm text-muted-foreground">Khoá lịch</Link>
+            </>
           )}
         </div>
         <div className="flex items-center gap-2">
