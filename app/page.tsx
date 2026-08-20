@@ -26,7 +26,7 @@ export default async function HomePage({
     // viewport, so without an explicit width the whole *page* scrolled
     // horizontally instead of just each day's own overflow-x-auto wrapper
     // (found while re-verifying mobile width for Task 8b's dark-mode fix).
-    <div className="mx-auto w-full min-w-0 max-w-6xl p-4">
+    <div className="mx-auto w-full min-w-0 max-w-[1600px] p-4">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BrandMark className="size-8" priority />

@@ -23,7 +23,19 @@ export default async function InternalLayout({ children }: { children: React.Rea
   return (
     <>
       <AppHeader profile={profile} />
-      <main className="mx-auto max-w-6xl p-4">{children}</main>
+      {/* w-full is load-bearing, not decorative: <main> is a direct flex
+          item of <body className="flex h-full flex-col"> (app/layout.tsx).
+          A flex item with mx-auto but no explicit width lets the auto
+          margins absorb the cross-axis free space instead of the default
+          align-items: stretch filling it — the box silently shrinks to its
+          content's natural width instead of the intended max-w-[1600px]
+          column (same class of flex-item-sizing gotcha as app/page.tsx's
+          w-full min-w-0, just the opposite symptom: collapsing instead of
+          overflowing). Found while widening this container off the back of
+          a "dashboard looks cramped" report — without w-full here the wider
+          max-width was a no-op, since content was already shrink-wrapped
+          well below the old max-w-6xl too. */}
+      <main className="mx-auto w-full max-w-[1600px] p-4">{children}</main>
     </>
   )
 }

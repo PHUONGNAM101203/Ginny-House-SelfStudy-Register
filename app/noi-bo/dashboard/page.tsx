@@ -92,24 +92,29 @@ export default async function DashboardPage() {
     .map(([period, count]) => ({ period: toDayMonth(period), count }))
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Dashboard thống kê</h1>
-      <section>
-        <h2 className="mb-2 font-medium">Tỷ lệ lấp đầy tuần này</h2>
-        <OccupancyChart rows={occupancy} />
-      </section>
-      <section>
-        <h2 className="mb-2 font-medium">Học sinh chưa đăng ký tuần này</h2>
-        <MissingRegistrationsList students={missing} />
-      </section>
-      <section>
-        <h2 className="mb-2 font-medium">Xu hướng đăng ký theo tuần (8 tuần gần nhất)</h2>
-        <TrendChart points={trendPoints} />
-      </section>
-      <section>
-        <h2 className="mb-2 font-medium">Xếp hạng tần suất học (4 tuần gần nhất)</h2>
-        <FrequencyRanking rows={ranking} />
-      </section>
+      {/* 2 columns on wide viewports so the 4 sections read as a balanced
+          grid instead of one long narrow column — paired thematically
+          (this-week stats on the left, multi-week trends on the right). */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">Tỷ lệ lấp đầy tuần này</h2>
+          <OccupancyChart rows={occupancy} />
+        </section>
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">Xu hướng đăng ký theo tuần (8 tuần gần nhất)</h2>
+          <TrendChart points={trendPoints} />
+        </section>
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">Học sinh chưa đăng ký tuần này</h2>
+          <MissingRegistrationsList students={missing} />
+        </section>
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">Xếp hạng tần suất học (4 tuần gần nhất)</h2>
+          <FrequencyRanking rows={ranking} />
+        </section>
+      </div>
     </div>
   )
 }

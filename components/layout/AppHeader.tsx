@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle"
 export function AppHeader({ profile }: { profile: Profile }) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between p-4">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between p-4">
         <div className="flex items-center gap-4">
           <Link href="/noi-bo/lich" className="font-semibold">Ginny House – Tự học</Link>
           <Link href="/noi-bo/lich" className="text-sm text-muted-foreground">Lịch</Link>
