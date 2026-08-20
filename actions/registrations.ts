@@ -93,3 +93,28 @@ export async function createRegistrationAsAdminAction(input: unknown): Promise<A
   revalidatePath("/")
   return { ok: true, data: { id: data.id } }
 }
+
+/**
+ * Permanently stop a recurring registration ("Huỷ luôn lịch cố định này").
+ *
+ * Distinct from cancelRegistrationAction, which only cancels one week's
+ * materialized instance — this deactivates the rule itself so it stops
+ * re-materializing and the desk/time is released for future weeks. Already
+ * materialized rows for past/current weeks are intentionally left alone; use
+ * the per-week cancel for those.
+ *
+ * Admin-only, enforced both here (requireAdmin) and in the database
+ * (recurring_registrations_admin_update, migration 0004).
+ */
+export async function deactivateRecurringRegistrationAction(id: string): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const supabase = await createServerClient()
+  const { error } = await supabase.from("recurring_registrations").update({ active: false }).eq("id", id)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  revalidatePath("/noi-bo/dashboard")
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/")
+  return { ok: true, data: null }
+}
