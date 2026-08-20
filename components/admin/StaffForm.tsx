@@ -4,6 +4,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { createStaffAction } from "@/actions/staff"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
 import { Button } from "@/components/ui/button"
 
 export function StaffForm() {
@@ -17,14 +18,21 @@ export function StaffForm() {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
+    // Stacked on a phone, inline from `sm`: these controls size to their own
+    // content, so on a 320px screen an inline row left each one too narrow to
+    // read its own placeholder.
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
       <Input placeholder="Họ tên" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
       <Input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <Input placeholder="Mật khẩu" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <select className="rounded border px-2 py-2" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "quan_sinh" })}>
+      <NativeSelect
+        aria-label="Vai trò"
+        value={form.role}
+        onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "quan_sinh" })}
+      >
         <option value="quan_sinh">Quản sinh</option>
         <option value="admin">Admin</option>
-      </select>
+      </NativeSelect>
       <Button onClick={submit}>Tạo tài khoản</Button>
     </div>
   )

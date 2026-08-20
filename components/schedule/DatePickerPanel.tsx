@@ -87,16 +87,16 @@ export function DatePickerPanel({
   // drop focus from whichever label the keyboard was on).
   const components = React.useMemo(
     () => ({
-      MonthCaption: ({
-        calendarMonth,
-        displayIndex: _displayIndex,
-        className,
-        ...divProps
-      }: MonthCaptionProps) => (
+      // Only `className` and `style` are taken from the props react-day-picker
+      // passes here; the rest (`calendarMonth`, `displayIndex`,
+      // `data-animated-caption`) are deliberately not spread onto the div —
+      // the first two are not DOM attributes, and the default children are the
+      // static caption label these two buttons replace.
+      MonthCaption: ({ calendarMonth, className, style }: MonthCaptionProps) => (
         // `className` carries ui/calendar.tsx's own month_caption layout
         // (the px-(--cell-size) gutters that keep the prev/next arrows clear),
         // so it is kept and only the gap is added.
-        <div className={cn(className, "gap-1")} {...divProps}>
+        <div className={cn(className, "gap-1")} style={style}>
           <Button
             type="button"
             variant="ghost"

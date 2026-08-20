@@ -72,10 +72,16 @@ export function DateNavigator({
   const rangeEnd = addYears(parseYmd(todayStr), MAX_YEARS_FROM_TODAY)
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        {leading}
-        <div className="flex flex-wrap items-center gap-2">
+    // Two stacked rows up to `xl`, one row from `xl` up. On a wide screen the
+    // stacked form left the whole bottom-right of the toolbar empty — the week
+    // strip is capped (see its own comment) so it cannot fill that band itself.
+    // At `xl` the wrapper below becomes `display: contents`, which dissolves it
+    // so its two children and the week strip all become items of this one flex
+    // row; `order-1/2/3` then puts them tabs | strip | controls.
+    <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-6">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 xl:contents">
+        <div className="min-w-0 xl:order-1">{leading}</div>
+        <div className="flex flex-wrap items-center gap-2 xl:order-3">
           <Button
             variant="outline"
             size="sm"
@@ -137,7 +143,7 @@ export function DateNavigator({
       {/* max-w-xl: full width on a phone, but capped on desktop so the seven
           cells stay a compact strip instead of stretching into huge blocks. */}
       <div
-        className="grid w-full max-w-xl grid-cols-7 gap-1"
+        className="grid w-full max-w-xl grid-cols-7 gap-1 xl:order-2 xl:min-w-0 xl:flex-1"
         role="group"
         aria-label="Chọn ngày trong tuần"
       >

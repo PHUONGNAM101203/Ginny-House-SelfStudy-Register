@@ -6,6 +6,7 @@ import { createBranchAction } from "@/actions/branches"
 import { createDeskAction, toggleDeskActiveAction } from "@/actions/desks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 type Branch = { id: string; code: string; name: string }
@@ -38,7 +39,9 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
     <div className="flex flex-col gap-8">
       <section>
         <h2 className="mb-2 font-medium">Cơ sở</h2>
-        <div className="mb-4 flex gap-2">
+        {/* Inputs are `w-full min-w-0`, so on one row at 320px they shrank to
+            ~110px each — narrower than their own placeholders. */}
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <Input placeholder="Mã (vd: hoang-gia)" value={newBranch.code} onChange={(e) => setNewBranch({ ...newBranch, code: e.target.value })} />
           <Input placeholder="Tên cơ sở" value={newBranch.name} onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })} />
           <Button onClick={addBranch}>Thêm</Button>
@@ -55,10 +58,13 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
 
       <section>
         <h2 className="mb-2 font-medium">Chỗ ngồi</h2>
-        <div className="mb-4 flex gap-2">
-          <select className="rounded border px-2" value={newDesk.branchId} onChange={(e) => setNewDesk({ ...newDesk, branchId: e.target.value })}>
+        {/* Stacked on a phone, inline from `sm` — same reason as the other two
+            admin forms: the branch select sizes to its widest option and had
+            no room to do that beside the label input at 320px. */}
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+          <NativeSelect aria-label="Cơ sở" value={newDesk.branchId} onChange={(e) => setNewDesk({ ...newDesk, branchId: e.target.value })}>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          </NativeSelect>
           <Input placeholder="Tên chỗ (vd: Chỗ 11)" value={newDesk.label} onChange={(e) => setNewDesk({ ...newDesk, label: e.target.value })} />
           <Button onClick={addDesk}>Thêm</Button>
         </div>
