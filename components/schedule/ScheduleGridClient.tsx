@@ -8,14 +8,14 @@ import { CancelDialog } from "@/components/booking/CancelDialog"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 
 export function ScheduleGridClient({
-  desks, monday, registrations, locks,
-}: { desks: Desk[]; monday: Date; registrations: RegistrationRow[]; locks: SlotLock[] }) {
+  desks, date, registrations, locks,
+}: { desks: Desk[]; date: string; registrations: RegistrationRow[]; locks: SlotLock[] }) {
   const router = useRouter()
   const [selected, setSelected] = useState<SlotClickPayload | null>(null)
 
   return (
     <>
-      <ScheduleGrid desks={desks} monday={monday} registrations={registrations} locks={locks} onSlotClick={setSelected} />
+      <ScheduleGrid desks={desks} date={date} registrations={registrations} locks={locks} onSlotClick={setSelected} />
       {selected && !selected.registration && (
         <BookingDialog
           open

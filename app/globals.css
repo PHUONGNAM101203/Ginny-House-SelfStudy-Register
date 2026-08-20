@@ -395,6 +395,16 @@
 .schedule-grid-calendar .rbc-calendar * {
   border-color: var(--calendar-grid) !important;
 }
+/* RBC always renders an all-day row under the resource headers. Nothing in
+   this app can ever produce an all-day event (every registration is a bounded
+   30-minute-grid range), so it was a permanently empty ~55px band above each
+   of the two stacked instances — 110px of dead space per day, which matters
+   most on a phone. Hidden rather than removed: it is RBC-internal markup, and
+   `display:none` on the cell is enough (the header row's own height is driven
+   by .rbc-header, which is untouched). */
+.schedule-grid-calendar .rbc-allday-cell {
+  display: none;
+}
 .schedule-grid-calendar .rbc-header {
   padding: 6px 4px;
   font-weight: 600;

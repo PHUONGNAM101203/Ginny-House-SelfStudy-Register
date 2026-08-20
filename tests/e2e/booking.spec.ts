@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test"
+import { format, addDays, parse } from "date-fns"
 
 // Golden path: a guest books a free slot on the grid, sees it turn into a
 // booked event, fails to cancel with the wrong name/phone, then succeeds
@@ -32,8 +33,10 @@ test("guest books a slot, it appears on the grid, wrong-credential cancel is rej
 }) => {
   await page.goto("/")
 
-  // First 08:00 free-slot cell in the grid (Monday, first desk of the
-  // default branch, given a freshly-reset DB with no existing bookings).
+  // The grid renders ONE day (today, since no ?day= is given) rather than the
+  // whole week, so there is exactly one 08:00 row per desk column. This
+  // `.first()` is therefore the first desk of the default branch on today's
+  // date, given a freshly-reset DB with no existing bookings.
   const freeCell = page.locator('.rbc-time-slot[class*="-08:00"]').first()
   await expect(freeCell).toBeVisible()
   await freeCell.click({ force: true })
@@ -72,4 +75,61 @@ test("guest books a slot, it appears on the grid, wrong-credential cancel is rej
   // selectable (free) again.
   await expect(page.locator(".rbc-event").filter({ hasText: "Playwright Tester" })).toHaveCount(0)
   await expect(page.locator('.rbc-time-slot[class*="-08:00"]').first()).toBeVisible()
+})
+
+// Day navigation (added with the single-day redesign): the grid shows one day,
+// and the three ways to change it — step buttons, the week strip, and the
+// date-picker popover — all have to move both ?day= and ?week= together, since
+// getScheduleData still fetches by week.
+test("day navigation moves the grid by step button, week strip and date picker", async ({ page }) => {
+  await page.goto("/")
+
+  // Vietnam's today, not the Node process's or the browser's — the app pins
+  // "today" to Asia/Ho_Chi_Minh, and playwright.config.ts deliberately runs the
+  // browser in UTC to prove the two never drift apart.
+  const today = parse(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()),
+    "yyyy-MM-dd",
+    new Date()
+  )
+  // Regex: the trigger's accessible name also carries the selected date.
+  const dateButton = page.getByRole("button", { name: /^Chọn ngày/ })
+  await expect(dateButton).toContainText(format(today, "dd/MM/yyyy"))
+
+  // Step forward one day.
+  await page.getByRole("button", { name: "Ngày sau" }).click()
+  const tomorrow = addDays(today, 1)
+  await expect(dateButton).toContainText(format(tomorrow, "dd/MM/yyyy"))
+  await expect(page).toHaveURL(new RegExp(`day=${format(tomorrow, "yyyy-MM-dd")}`))
+  // ?week= must travel with ?day= — that is what re-fetches the right week.
+  await expect(page).toHaveURL(/week=\d{4}-\d{2}-\d{2}/)
+
+  // The week strip jumps straight to a chosen day in the loaded week.
+  await page.getByRole("button", { name: format(today, "dd/MM/yyyy"), exact: false }).first().click()
+  await expect(dateButton).toContainText(format(today, "dd/MM/yyyy"))
+
+  // The popover date picker jumps to an arbitrary date, including one in a
+  // different week (which changes ?week= as well).
+  const distant = addDays(today, 40)
+  await dateButton.click()
+  const picker = page.getByRole("dialog")
+  await expect(picker).toBeVisible()
+  // Year first, then month: +40 days can cross a year boundary in December,
+  // and the month dropdown only moves within the displayed year.
+  await picker.getByRole("combobox", { name: "Choose the Year" }).selectOption(String(distant.getFullYear()))
+  await picker.getByRole("combobox", { name: "Choose the Month" }).selectOption({ index: distant.getMonth() })
+  await picker.getByRole("button", { name: new RegExp(`ngày ${distant.getDate()} tháng`) }).first().click()
+  await expect(dateButton).toContainText(format(distant, "dd/MM/yyyy"))
+  await expect(page).toHaveURL(new RegExp(`day=${format(distant, "yyyy-MM-dd")}`))
+
+  // "Hôm nay" always comes back, and disables itself once there.
+  const todayButton = page.getByRole("button", { name: "Về hôm nay" })
+  await todayButton.click()
+  await expect(dateButton).toContainText(format(today, "dd/MM/yyyy"))
+  await expect(todayButton).toBeDisabled()
 })

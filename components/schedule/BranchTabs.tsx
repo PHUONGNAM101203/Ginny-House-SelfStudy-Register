@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export function BranchTabs({ branches, activeBranchId }: { branches: { id: string; name: string }[]; activeBranchId: string }) {
   const router = useRouter()
   const params = useSearchParams()
-  // Same reuse as WeekPicker: mounted by both "/" and "/noi-bo/lich", so the
+  // Same reuse as DateNavigator: mounted by both "/" and "/noi-bo/lich", so the
   // target path must follow the current route rather than be hardcoded to "/".
   const pathname = usePathname()
 
