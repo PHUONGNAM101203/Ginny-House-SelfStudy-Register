@@ -17,15 +17,16 @@ import { test, expect } from "@playwright/test"
 // - Booked slots render as RBC "events" (`.rbc-event`, titled with the
 //   student name) which sit above that empty container, so they don't have
 //   the same problem — a plain `.click()` on them works fine.
-// - RBC computes which exact slot a click lands on from raw pixel
-//   coordinates, and that computation is not pixel-stable: the same
-//   `.click({ force: true })` on the "08:00" cell was observed (confirmed
-//   directly against the `registrations` table, not just the UI) to
-//   sometimes book 08:00-08:30 and sometimes the adjacent 08:30-09:00 row.
-//   Nudging the click position didn't reliably fix this. Since the exact
-//   slot booked doesn't matter for this golden-path test, the assertions
-//   below deliberately never depend on which specific time got booked —
-//   only on the desk/student-name-scoped dialog and event elements.
+// - This test used to avoid asserting *which* slot got booked, because the
+//   same click on the "08:00" cell would sometimes book 08:30-09:00 instead
+//   (confirmed against the `registrations` table, not just the UI). Root
+//   cause found and fixed in ScheduleGrid.tsx: RBC auto-scrolled
+//   .rbc-time-content by ~56px in componentDidMount, so a click landing in
+//   that post-paint window was resolved against geometry that had moved
+//   under the pointer. With `scrollToTime` pinned to the range start the
+//   layout no longer shifts, and the resolved slot is now exact and stable
+//   (verified over repeated runs, dialog title + DB row), so the assertions
+//   below check the specific expected time.
 test("guest books a slot, it appears on the grid, wrong-credential cancel is rejected, correct cancel succeeds", async ({
   page,
 }) => {
@@ -33,13 +34,13 @@ test("guest books a slot, it appears on the grid, wrong-credential cancel is rej
 
   // First 08:00 free-slot cell in the grid (Monday, first desk of the
   // default branch, given a freshly-reset DB with no existing bookings).
-  // The actual slot RBC ends up booking may be this one or the next row
-  // (see note above) — both are free, valid, unlocked slots for this test.
   const freeCell = page.locator('.rbc-time-slot[class*="-08:00"]').first()
   await expect(freeCell).toBeVisible()
   await freeCell.click({ force: true })
 
-  await expect(page.getByRole("heading", { name: /Đăng ký Chỗ/ })).toBeVisible()
+  // The dialog title carries the resolved range that will be submitted, so
+  // this asserts the click booked the slot that was actually clicked.
+  await expect(page.getByRole("heading", { name: /Đăng ký Chỗ 1 — 08:00-08:30/ })).toBeVisible()
 
   await page.getByLabel("Họ tên").fill("Playwright Tester")
   await page.getByLabel("Số điện thoại").fill("0912345678")
@@ -50,6 +51,9 @@ test("guest books a slot, it appears on the grid, wrong-credential cancel is rej
   const bookedEvent = page.locator(".rbc-event").filter({ hasText: "Playwright Tester" }).first()
   await expect(bookedEvent).toBeVisible()
   await bookedEvent.click()
+
+  // Same check on the way out: the booking that was created is the 08:00 one.
+  await expect(page.getByRole("heading", { name: /Huỷ đăng ký Chỗ 1 — 08:00-08:30/ })).toBeVisible()
 
   await page.getByLabel("Họ tên").fill("Playwright Tester")
   await page.getByLabel("Số điện thoại").fill("0999999999")

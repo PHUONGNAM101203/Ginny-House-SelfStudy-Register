@@ -52,6 +52,26 @@ function timeOnDate(date: Date, hm: string): Date {
   return setMinutes(setHours(date, h), m)
 }
 
+const SLOT_MINUTES = 30
+
+// RBC resolves which slot a click landed on from raw pixel coordinates, and that
+// computation is not pixel-stable: the same click on the "08:00" cell was observed
+// (verified against the `registrations` table, not just the UI) to sometimes resolve
+// to 08:00 and sometimes to the adjacent 08:30. Snapping both ends onto the real
+// 30-minute grid before the payload is built guarantees the booked range always
+// matches a slot that is actually rendered, whatever sub-slot imprecision RBC hands us.
+function floorToSlot(date: Date): Date {
+  const minutes = date.getHours() * 60 + date.getMinutes()
+  const floored = Math.floor(minutes / SLOT_MINUTES) * SLOT_MINUTES
+  return setMinutes(setHours(date, Math.floor(floored / 60)), floored % 60)
+}
+
+function ceilToSlot(date: Date): Date {
+  const minutes = date.getHours() * 60 + date.getMinutes()
+  const ceiled = Math.ceil(minutes / SLOT_MINUTES) * SLOT_MINUTES
+  return setMinutes(setHours(date, Math.floor(ceiled / 60)), ceiled % 60)
+}
+
 export function ScheduleGrid({
   desks, monday, registrations, locks, onSlotClick,
 }: {
@@ -92,8 +112,16 @@ export function ScheduleGrid({
           const deskId = String(slotInfo.resourceId)
           const desk = desks.find((d) => d.id === deskId)
           if (!desk) return
-          const startTime = format(slotInfo.start, "HH:mm")
-          const endTime = format(slotInfo.end, "HH:mm")
+          // Snap onto the real 30-minute grid (see floorToSlot/ceilToSlot above).
+          // ceil is used for the end rather than a forced start+30 so a multi-slot
+          // drag selection still books its whole range; the max() keeps a
+          // degenerate/sub-slot selection from collapsing to a zero-length range.
+          const snappedStart = floorToSlot(slotInfo.start)
+          const snappedEnd = new Date(
+            Math.max(ceilToSlot(slotInfo.end).getTime(), addMinutes(snappedStart, SLOT_MINUTES).getTime())
+          )
+          const startTime = format(snappedStart, "HH:mm")
+          const endTime = format(snappedEnd, "HH:mm")
           // Enforcement lives here, not in slotPropGetter — the CSS class RBC
           // renders for a locked slot is visual only, it does not stop clicks.
           if (isLocked(deskId, isoDow, startTime, endTime)) return
@@ -167,6 +195,17 @@ export function ScheduleGrid({
                   timeslots={1}
                   min={timeOnDate(date, range.start)}
                   max={timeOnDate(date, range.end)}
+                  // Pin RBC's mount-time auto-scroll to the top of our own range.
+                  // RBC defaults scrollToTime to ~the current time of day, so in
+                  // componentDidMount it scrolled .rbc-time-content down by ~56px
+                  // (1.4 slots) *after* first paint. Two consequences: the first
+                  // slot row started out hidden under the header, and a click that
+                  // landed in that post-paint window was resolved by RBC against
+                  // geometry that had shifted under the pointer — which is the real
+                  // cause of the "booked the adjacent slot" flakiness recorded in
+                  // tests/e2e/booking.spec.ts. Our min/max already frame exactly the
+                  // range we want visible, so there is nothing to scroll to.
+                  scrollToTime={timeOnDate(date, range.start)}
                   onSelectSlot={handleSelectSlot}
                   onSelectEvent={handleSelectEvent}
                   slotPropGetter={slotPropGetter}
