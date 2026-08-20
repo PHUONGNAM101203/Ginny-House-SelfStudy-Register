@@ -376,9 +376,17 @@
      the rules that actually enforce them, so the container height and the row
      height can never disagree — which is exactly how the previous hardcoded
      `height: 340 / 620` inline styles went wrong (both were eyeballed, and
-     both came out shorter than their own rows needed). */
-  --rbc-slot-row: 40px;
-  --rbc-header-row: 36px;
+     both came out shorter than their own rows needed).
+
+     Expressed in rem, not px, on purpose. These are the two terms that decide
+     whether every row fits, and Firefox's text-only zoom / Chrome's minimum
+     font size grow the *text* without growing a px box — under which the rows
+     would outgrow a px-sized container and 21:00 onward would drop back below
+     the fold, re-creating the very bug this replaced (WCAG 1.4.4). rem tracks
+     the root font size, so the container grows with its content.
+     2.5rem/2.25rem are 40px/36px at the default 16px root. */
+  --rbc-slot-row: 2.5rem;
+  --rbc-header-row: 2.25rem;
   /* Border chrome that sits between the container edge and the scrollable row
      area, and so has to be added on top of rows + header. Measured against the
      rendered DOM, not guessed: 1px `.rbc-time-view` border-top + 1px its
@@ -394,30 +402,48 @@
      --rbc-slot-row that the timeslot-group rule below pins makes the block
      exactly tall enough for every row it renders, so the last row (11:30 and
      21:30 respectively) is fully visible without scrolling. */
+  /* The `, 16` fallback matters: if --rbc-slot-count were ever missing, the
+     calc would be invalid-at-computed-value-time, and IACVT is resolved *after*
+     the cascade — so it would defeat RBC's own `.rbc-calendar { height: 100% }`
+     too and collapse the grid to a bare header band, with no error anywhere.
+     16 is the taller of the two real blocks, so the failure mode is a slightly
+     roomy calendar rather than an invisible one. */
   height: calc(
-    var(--rbc-slot-count) * var(--rbc-slot-row) + var(--rbc-header-row) + var(--rbc-chrome)
+    var(--rbc-slot-count, 16) * var(--rbc-slot-row) + var(--rbc-header-row) + var(--rbc-chrome)
   );
 }
-/* Pin the row height rather than leaving RBC's `min-height: 40px` free to be
-   stretched by `.rbc-time-column .rbc-timeslot-group { flex: 1 }`. Without
-   this the rows would still fill any container we gave them, so the height
-   calc above would be self-fulfilling and could never be verified. */
+/* Restates RBC's own `min-height: 40px` in terms of --rbc-slot-row, so that
+   changing that one variable moves the rows and the container together. Note
+   this does NOT stop `.rbc-time-column .rbc-timeslot-group { flex: 1 }` from
+   stretching the rows — min-height is a floor, not a cap. What actually makes
+   a row come out at exactly --rbc-slot-row is the container height above. */
 .schedule-grid-calendar .rbc-timeslot-group {
   min-height: var(--rbc-slot-row);
 }
-/* Pin the resource-header band too. It is the other term in the height calc,
-   and it is the one thing that could silently grow — a desk label wrapping to
-   a second line at a narrow width would push the rows back below the fold.
-   Fixed height + truncation keeps the calc exact at every viewport. */
-.schedule-grid-calendar .rbc-time-header,
-.schedule-grid-calendar .rbc-time-header .rbc-header {
+/* Pin the resource-header band: it is the other term in the height calc, and
+   the one thing that could silently grow — a desk label wrapping to a second
+   line at a narrow width would push the rows back below the fold. */
+.schedule-grid-calendar .rbc-time-header {
   height: var(--rbc-header-row);
   flex: none;
 }
+/* Height only — deliberately NOT `flex: none` as well. Stock RBC gives each
+   resource header `flex: 1 1 0` beside a literal `width: 140px`; killing the
+   flex makes it fall back to that 140px and stop growing with its column, so
+   on any viewport wide enough for columns to exceed 140px the desk names drift
+   out from under their own columns (measured: 140px header over a 152px column
+   at 1920).
+   Centring is line-height, not flexbox: `text-overflow` only applies to a
+   block container, so `display: flex` would silently disable the ellipsis and
+   — being centred — clip an over-long label at BOTH ends instead. */
 .schedule-grid-calendar .rbc-time-header .rbc-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: var(--rbc-header-row);
+  /* line-height does the vertical centring, so the block's own vertical
+     padding (set by the .rbc-header rule above) has to go — otherwise the
+     line box is taller than the content box and overflow:hidden slices it. */
+  padding-block: 0;
+  line-height: var(--rbc-header-row);
+  text-align: center;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

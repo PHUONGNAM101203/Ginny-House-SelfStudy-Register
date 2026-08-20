@@ -16,7 +16,9 @@ export type ScheduleDates = {
 // granted to `anon`, so without a clamp an unauthenticated `?day=3000-01-01`
 // would insert a recurring row per rule dated in the year 3000, once per
 // distinct week an attacker names.
-const MAX_YEARS_FROM_TODAY = 2
+// Exported so the date picker bounds itself to exactly this window rather than
+// keeping a second copy in sync by comment (which is how it was done before).
+export const MAX_YEARS_FROM_TODAY = 2
 
 /**
  * Resolve the `?day=` / `?week=` search params into the day the grid shows and

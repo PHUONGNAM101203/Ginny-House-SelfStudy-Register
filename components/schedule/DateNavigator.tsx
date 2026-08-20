@@ -8,15 +8,12 @@ import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from
 import { Button } from "@/components/ui/button"
 import { DatePickerPanel } from "@/components/schedule/DatePickerPanel"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { MAX_YEARS_FROM_TODAY } from "@/lib/schedule-params"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { parseYmd, toYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
 
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
-
-// Kept in sync with lib/schedule-params.ts's MAX_YEARS_FROM_TODAY, which is the
-// authority — this is only the picker's matching visual bound.
-const MAX_YEARS_FROM_TODAY = 2
 
 /**
  * Day navigation for the schedule grid: a Today button, prev/next day steps, a
@@ -80,7 +77,11 @@ export function DateNavigator({
     // row; `order-1/2/3` then puts them tabs | strip | controls.
     <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-6">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 xl:contents">
-        <div className="min-w-0 xl:order-1">{leading}</div>
+        {/* Rendered only when there is something to put in it. An always-present
+            empty wrapper would be a zero-width first child, and `justify-between`
+            would then shove the day controls to the right edge — which is what
+            a database with no branches yet would have looked like. */}
+        {leading && <div className="min-w-0 xl:order-1">{leading}</div>}
         <div className="flex flex-wrap items-center gap-2 xl:order-3">
           <Button
             variant="outline"
@@ -143,7 +144,10 @@ export function DateNavigator({
       {/* max-w-xl: full width on a phone, but capped on desktop so the seven
           cells stay a compact strip instead of stretching into huge blocks. */}
       <div
-        className="grid w-full max-w-xl grid-cols-7 gap-1 xl:order-2 xl:min-w-0 xl:flex-1"
+        // xl:min-w-56 floors the strip at its seven size-8 discs: grid-cols-7
+        // is minmax(0,1fr), so a flex-1 track with no floor could be squeezed
+        // narrower than its own content and the discs would overlap.
+        className="grid w-full max-w-xl grid-cols-7 gap-1 xl:order-2 xl:min-w-56 xl:flex-1"
         role="group"
         aria-label="Chọn ngày trong tuần"
       >
