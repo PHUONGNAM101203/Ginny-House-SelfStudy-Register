@@ -45,12 +45,13 @@ export function CancelDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">Nhập lại đúng Tên + SĐT đã dùng để đăng ký để xác nhận huỷ.</p>
-          <div>
+          {/* gap-1.5: same cramped label/input spacing fix as BookingDialog. */}
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="fullName">Họ tên</Label>
             <Input id="fullName" {...register("fullName")} />
             {errors.fullName && <p className="text-sm text-destructive">{errors.fullName.message}</p>}
           </div>
-          <div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone">Số điện thoại</Label>
             <Input id="phone" {...register("phone")} />
             {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}

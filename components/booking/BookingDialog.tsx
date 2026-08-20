@@ -51,19 +51,28 @@ export function BookingDialog({
         <DialogHeader>
           <DialogTitle>Đăng ký {deskLabel} — {startTime}-{endTime}</DialogTitle>
         </DialogHeader>
+        {/* gap-1.5 inside each field: the label used to sit flush on the input's
+            top border, which read as cramped at every width. */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="fullName">Họ tên</Label>
             <Input id="fullName" {...register("fullName")} />
             {errors.fullName && <p className="text-sm text-destructive">{errors.fullName.message}</p>}
           </div>
-          <div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone">Số điện thoại</Label>
             <Input id="phone" {...register("phone")} />
             {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={watch("isRecurring") ?? false} onChange={(e) => setValue("isRecurring", e.target.checked)} />
+            {/* accent-* keeps the native control on the brand colour instead of
+                rendering as a stray light-grey square on the dark surface. */}
+            <input
+              type="checkbox"
+              className="size-4 shrink-0 accent-[var(--primary)]"
+              checked={watch("isRecurring") ?? false}
+              onChange={(e) => setValue("isRecurring", e.target.checked)}
+            />
             Đăng ký cố định (tự giữ chỗ mỗi tuần)
           </label>
           <DialogFooter>
