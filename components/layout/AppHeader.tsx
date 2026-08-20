@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { Profile } from "@/types"
 import { ThemeToggle } from "@/components/layout/ThemeToggle"
+import { SignOutButton } from "@/components/layout/SignOutButton"
 
 export function AppHeader({ profile }: { profile: Profile }) {
   return (
@@ -22,6 +23,7 @@ export function AppHeader({ profile }: { profile: Profile }) {
         <div className="flex items-center gap-2">
           <span className="text-sm">{profile.fullName}</span>
           <ThemeToggle />
+          <SignOutButton />
         </div>
       </div>
     </header>

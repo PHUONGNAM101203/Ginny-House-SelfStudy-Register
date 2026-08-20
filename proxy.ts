@@ -19,10 +19,15 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getClaims().then(
-    (r) => ({ data: { user: r.data?.claims ? { id: r.data.claims.sub } : null } }),
-    () => ({ data: { user: null } })
-  )
+  // getUser() (not getClaims()) on purpose: getClaims only verifies the JWT's
+  // signature and expiry locally, so it still reports a "user" for a session whose
+  // auth user has since been deleted or revoked. lib/auth.ts validates server-side
+  // via getUser(), and any disagreement between the two layers is an unrecoverable
+  // redirect loop — this gate sends the session to /noi-bo/lich while requireProfile
+  // sends it straight back to /noi-bo/dang-nhap, and the user cannot even reach the
+  // login page to fix it. Both layers now ask the same authority. Costs one auth
+  // round-trip per matched request, which is the documented @supabase/ssr pattern.
+  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }))
 
   const path = request.nextUrl.pathname
   const isInternal = path.startsWith("/noi-bo") && path !== "/noi-bo/dang-nhap"
