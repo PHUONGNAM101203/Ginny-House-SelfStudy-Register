@@ -19,6 +19,48 @@ describe("computeOccupancy", () => {
     expect(result[0].totalSlots).toBe(0)
     expect(result[0].rate).toBe(0)
   })
+
+  it("counts every 30-minute slot a single multi-slot registration covers", () => {
+    // One row spanning 08:00-09:30 covers 3 slots (08:00, 08:30, 09:00). Counting
+    // registration rows instead of covered slots would report 1.
+    const desks = [{ id: "d1", label: "Chỗ 1" }]
+    const registrations = [{ deskId: "d1", date: "2026-08-17", startTime: "08:00", endTime: "09:30" }]
+    const result = computeOccupancy(desks, registrations, [], ["2026-08-17"])
+    expect(result[0].bookedSlots).toBe(3)
+    expect(result[0].totalSlots).toBe(24)
+    expect(result[0].rate).toBeCloseTo(3 / 24)
+  })
+
+  it("sums slots across several registrations on the same desk-day without double counting", () => {
+    const desks = [{ id: "d1", label: "Chỗ 1" }]
+    const registrations = [
+      { deskId: "d1", date: "2026-08-17", startTime: "08:00", endTime: "09:00" }, // 2 slots
+      { deskId: "d1", date: "2026-08-17", startTime: "14:00", endTime: "14:30" }, // 1 slot
+    ]
+    const result = computeOccupancy(desks, registrations, [], ["2026-08-17"])
+    expect(result[0].bookedSlots).toBe(3)
+  })
+
+  it("does not count registrations belonging to another desk or another date", () => {
+    const desks = [{ id: "d1", label: "Chỗ 1" }]
+    const registrations = [
+      { deskId: "d2", date: "2026-08-17", startTime: "08:00", endTime: "10:00" },
+      { deskId: "d1", date: "2026-08-18", startTime: "08:00", endTime: "10:00" },
+    ]
+    const result = computeOccupancy(desks, registrations, [], ["2026-08-17"])
+    expect(result[0].bookedSlots).toBe(0)
+  })
+
+  it("never counts a booked slot that is excluded from the available total by a lock", () => {
+    // A lock removes 08:00-09:00 from availableSlots; a registration overlapping it
+    // must not push bookedSlots above totalSlots (rate > 1 would be nonsense).
+    const desks = [{ id: "d1", label: "Chỗ 1" }]
+    const locks = [{ deskId: "d1", dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }]
+    const registrations = [{ deskId: "d1", date: "2026-08-17", startTime: "08:00", endTime: "09:30" }]
+    const result = computeOccupancy(desks, registrations, locks, ["2026-08-17"])
+    expect(result[0].totalSlots).toBe(22)
+    expect(result[0].bookedSlots).toBe(1)
+  })
 })
 
 describe("findMissingRegistrations", () => {

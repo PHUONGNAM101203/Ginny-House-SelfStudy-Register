@@ -22,7 +22,16 @@ export function computeOccupancy(
             (l) => (l.deskId === desk.id || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < slot.end && l.endTime > slot.start
           )
       )
-      const booked = registrations.filter((r) => r.deskId === desk.id && r.date === date).length
+      // Count SLOTS covered, not registration rows. Since Task 8b's react-big-calendar
+      // rewrite a single registration can span a drag-selected multi-slot range
+      // (e.g. 08:00-10:00 = 4 slots in one row), so counting rows silently
+      // under-reported occupancy. Same half-open [start, end) overlap check used by
+      // ScheduleGrid's isLocked and the booking RPCs.
+      const booked = availableSlots.filter((slot) =>
+        registrations.some(
+          (r) => r.deskId === desk.id && r.date === date && r.startTime < slot.end && r.endTime > slot.start
+        )
+      ).length
       return {
         deskId: desk.id,
         date,
