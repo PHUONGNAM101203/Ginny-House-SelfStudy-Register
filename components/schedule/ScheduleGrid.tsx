@@ -46,8 +46,8 @@ const messages = {
 // RBC has no way to render one day as a single time axis with a gap in the
 // middle, so each day is two stacked instances — one per opening block.
 const BLOCKS = [
-  { key: "morning", label: "Buổi sáng", start: "08:00", end: "12:00", height: 340 },
-  { key: "afternoon", label: "Buổi chiều – tối", start: "14:00", end: "22:00", height: 620 },
+  { key: "morning", label: "Buổi sáng", start: "08:00", end: "12:00" },
+  { key: "afternoon", label: "Buổi chiều – tối", start: "14:00", end: "22:00" },
 ] as const
 
 function timeOnDate(date: Date, hm: string): Date {
@@ -56,6 +56,30 @@ function timeOnDate(date: Date, hm: string): Date {
 }
 
 const SLOT_MINUTES = 30
+
+function minutesOf(hm: string): number {
+  const [h, m] = hm.split(":").map(Number)
+  return h * 60 + m
+}
+
+/**
+ * How many 30-minute rows RBC renders for a block.
+ *
+ * A block is a half-open range: 08:00–12:00 is 8 rows whose last one *starts*
+ * at 11:30 and represents 11:30–12:00. There is deliberately no row starting
+ * at 12:00 — that one would run past the block's end.
+ *
+ * This count is what sizes the container (via the `--rbc-slot-count` custom
+ * property read by the `.schedule-grid-calendar .rbc-calendar` height rule in
+ * app/globals.css). It replaces the two hand-tuned pixel heights that used to
+ * live here: those were eyeballed rather than derived, and both were short of
+ * what their rows actually needed — the afternoon block was 56px (1.4 rows)
+ * short, so 21:00 onward sat below the fold of `.rbc-time-content`'s scroll
+ * area and read as if the grid simply stopped before its stated 22:00 end.
+ */
+function slotCount(block: { start: string; end: string }): number {
+  return (minutesOf(block.end) - minutesOf(block.start)) / SLOT_MINUTES
+}
 
 // RBC resolves which slot a click landed on from raw pixel coordinates, and that
 // computation is not pixel-stable: the same click on the "08:00" cell was observed
@@ -202,7 +226,16 @@ export function ScheduleGrid({
       <div className="min-w-0 overflow-x-auto rounded-lg border border-border">
         <div className="schedule-grid-calendar min-w-fit">
           {BLOCKS.map((block) => (
-            <section key={block.key} aria-label={`${block.label} — ${format(date, "dd/MM/yyyy")}`}>
+            <section
+              key={block.key}
+              aria-label={`${block.label} — ${format(date, "dd/MM/yyyy")}`}
+              // The block's row count, not a pixel height: app/globals.css
+              // multiplies it by the same --rbc-slot-row that sizes an actual
+              // row, so the container is exactly as tall as its content by
+              // construction and cannot drift out of sync the way the two
+              // hardcoded heights did. See slotCount() above.
+              style={{ "--rbc-slot-count": slotCount(block) } as React.CSSProperties}
+            >
               {/* sticky left-0 w-fit: the block label stays readable while the
                   desk columns scroll sideways underneath it. */}
               <h3 className="sticky left-0 w-fit px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -252,7 +285,6 @@ export function ScheduleGrid({
                 onSelectSlot={handleSelectSlot}
                 onSelectEvent={handleSelectEvent}
                 slotPropGetter={slotPropGetter}
-                style={{ height: block.height }}
               />
             </section>
           ))}

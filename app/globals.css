@@ -371,9 +371,56 @@
    — only the parts that apply to a resource-column day grid; the shift
    calendar's event-type color variants (leave, attendance, holiday, …) have
    no equivalent here. */
+.schedule-grid-calendar {
+  /* The two numbers the block height is built from. They live here, next to
+     the rules that actually enforce them, so the container height and the row
+     height can never disagree — which is exactly how the previous hardcoded
+     `height: 340 / 620` inline styles went wrong (both were eyeballed, and
+     both came out shorter than their own rows needed). */
+  --rbc-slot-row: 40px;
+  --rbc-header-row: 36px;
+  /* Border chrome that sits between the container edge and the scrollable row
+     area, and so has to be added on top of rows + header. Measured against the
+     rendered DOM, not guessed: 1px `.rbc-time-view` border-top + 1px its
+     border-bottom + 2px `.rbc-time-content` border-top (stock RBC stylesheet).
+     Omitting it left exactly 4px of the last row clipped. */
+  --rbc-chrome: 4px;
+}
 .schedule-grid-calendar .rbc-calendar {
   color: var(--foreground);
   font-family: var(--font-sans);
+  /* --rbc-slot-count is set per block by ScheduleGrid (see its slotCount()):
+     8 rows for 08:00–12:00, 16 for 14:00–22:00. Multiplying it by the same
+     --rbc-slot-row that the timeslot-group rule below pins makes the block
+     exactly tall enough for every row it renders, so the last row (11:30 and
+     21:30 respectively) is fully visible without scrolling. */
+  height: calc(
+    var(--rbc-slot-count) * var(--rbc-slot-row) + var(--rbc-header-row) + var(--rbc-chrome)
+  );
+}
+/* Pin the row height rather than leaving RBC's `min-height: 40px` free to be
+   stretched by `.rbc-time-column .rbc-timeslot-group { flex: 1 }`. Without
+   this the rows would still fill any container we gave them, so the height
+   calc above would be self-fulfilling and could never be verified. */
+.schedule-grid-calendar .rbc-timeslot-group {
+  min-height: var(--rbc-slot-row);
+}
+/* Pin the resource-header band too. It is the other term in the height calc,
+   and it is the one thing that could silently grow — a desk label wrapping to
+   a second line at a narrow width would push the rows back below the fold.
+   Fixed height + truncation keeps the calc exact at every viewport. */
+.schedule-grid-calendar .rbc-time-header,
+.schedule-grid-calendar .rbc-time-header .rbc-header {
+  height: var(--rbc-header-row);
+  flex: none;
+}
+.schedule-grid-calendar .rbc-time-header .rbc-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* Same rationale as the reference app: don't tint the whole "today" column,
    it reads as noise against a weekly grid that already labels each day. */
