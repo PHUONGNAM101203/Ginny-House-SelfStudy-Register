@@ -1,5 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public"
-import { getWeekDates } from "@/lib/week"
+import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { format } from "date-fns"
 
 export type Desk = { id: string; label: string }
@@ -20,7 +20,11 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
       .eq("branch_id", branchId)
       .eq("status", "active")
       .gte("date", from)
-      .lte("date", to),
+      .lte("date", to)
+      // .limit(10000) matches supabase/config.toml's raised `max_rows`: explicit and intentional
+      // rather than silently truncating at PostgREST's default (which could render a booked slot
+      // as free). TODO: replace with SQL-side aggregation (view/RPC) once data volume grows.
+      .limit(10000),
     supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("branch_id", branchId).eq("active", true),
   ])
 
@@ -52,9 +56,19 @@ function toHm(value: string): string {
 }
 
 export async function materializeWeek(weekMonday: Date) {
+  // Guard against retroactively fabricating attendance. Both the guest page and
+  // /noi-bo/lich call this for whatever week the URL asks for, so browsing back
+  // to any past week used to insert source='recurring_auto' rows dated in the
+  // past — sessions that never happened — which then poison the dashboard's
+  // trend chart and frequency ranking. Materializing is only ever meaningful
+  // for the current week onward.
+  const requested = format(weekMonday, "yyyy-MM-dd")
+  const currentWeek = format(getMondayOfWeek(new Date()), "yyyy-MM-dd")
+  if (requested < currentWeek) return
+
   const supabase = createPublicClient()
   await supabase.rpc("materialize_recurring_registrations", {
-    p_week_start: format(weekMonday, "yyyy-MM-dd"),
+    p_week_start: requested,
   })
 }
 

@@ -58,7 +58,10 @@ export default async function DashboardPage() {
     // shapes with no status field (they trust the caller to have already filtered),
     // so this filter has to happen here at the query, same as lib/schedule-data.ts's
     // getScheduleData does for the guest schedule grid.
-    supabase.from("registrations").select("student_id, student_name, desk_id, date, start_time, end_time, status").eq("status", "active").gte("date", eightWeeksAgo),
+    // .limit(10000) matches supabase/config.toml's raised `max_rows`: explicit and intentional
+    // rather than silently truncating at PostgREST's default. TODO: replace with SQL-side
+    // aggregation (a view or RPC returning pre-computed metrics) once data volume grows.
+    supabase.from("registrations").select("student_id, student_name, desk_id, date, start_time, end_time, status").eq("status", "active").gte("date", eightWeeksAgo).limit(10000),
     supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("active", true),
     supabase.from("recurring_registrations").select("student_id, student_name, day_of_week, active").eq("active", true),
   ])
