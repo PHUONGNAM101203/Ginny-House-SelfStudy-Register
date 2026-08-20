@@ -2,6 +2,7 @@ import { getBranches, getScheduleData } from "@/lib/schedule-data"
 import { getMondayOfWeek } from "@/lib/week"
 import { BranchTabs } from "@/components/schedule/BranchTabs"
 import { WeekPicker } from "@/components/schedule/WeekPicker"
+import { ScheduleGridClient } from "@/components/schedule/ScheduleGridClient"
 
 export default async function HomePage({
   searchParams,
@@ -22,9 +23,12 @@ export default async function HomePage({
         <WeekPicker monday={monday} />
       </div>
       {schedule && (
-        <p className="text-sm text-muted-foreground">
-          {schedule.desks.length} chỗ, {schedule.registrations.length} lượt đăng ký tuần này.
-        </p>
+        <ScheduleGridClient
+          desks={schedule.desks}
+          monday={monday}
+          registrations={schedule.registrations}
+          locks={schedule.locks}
+        />
       )}
     </div>
   )

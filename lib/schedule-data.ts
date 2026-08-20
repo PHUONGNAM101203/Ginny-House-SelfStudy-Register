@@ -27,12 +27,28 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
   return {
     desks: (desks ?? []) as Desk[],
     registrations: (registrations ?? []).map((r) => ({
-      id: r.id, deskId: r.desk_id, date: r.date, startTime: r.start_time, endTime: r.end_time, studentName: r.student_name,
+      id: r.id,
+      deskId: r.desk_id,
+      date: r.date,
+      startTime: toHm(r.start_time),
+      endTime: toHm(r.end_time),
+      studentName: r.student_name,
     })) as RegistrationRow[],
     locks: (locks ?? []).map((l) => ({
-      deskId: l.desk_id, dayOfWeek: l.day_of_week, startTime: l.start_time, endTime: l.end_time,
+      deskId: l.desk_id,
+      dayOfWeek: l.day_of_week,
+      startTime: toHm(l.start_time),
+      endTime: toHm(l.end_time),
     })) as SlotLock[],
   }
+}
+
+// Postgres `time` columns serialize over PostgREST as "HH:MM:SS" (or "HH:MM:SS.ffffff" if a value
+// ever carries fractional seconds). The rest of the TS layer works with plain "HH:MM" strings
+// (see lib/time-slots.ts), so normalize at this boundary before returning to callers.
+function toHm(value: string): string {
+  const [h, m] = value.split(":")
+  return `${h}:${m}`
 }
 
 export async function getBranches() {
