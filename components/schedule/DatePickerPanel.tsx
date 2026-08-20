@@ -156,7 +156,9 @@ export function DatePickerPanel({
   const gridLabel = mode === "month" ? "Chọn tháng" : "Chọn năm"
 
   return (
-    <div className="flex flex-col gap-3" aria-label={gridLabel}>
+    // No aria-label here: an aria-label on a plain div with no role is ignored
+    // by assistive tech. The `role="group"` below carries the name.
+    <div className="flex flex-col gap-3">
       {/* Header mirrors the day view's caption bar so the panel does not jump
           between views: same height, same centred label. In the month view the
           label is the year, and clicking it goes one level further out to the
