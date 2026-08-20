@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
+import { sortDesks } from "@/lib/desks"
 import { format } from "date-fns"
 
 export type Desk = { id: string; label: string }
@@ -13,7 +14,9 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
   const to = format(dates[6], "yyyy-MM-dd")
 
   const [{ data: desks }, { data: registrations }, { data: locks }] = await Promise.all([
-    supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true).order("label"),
+    // No .order() here: Postgres would sort "Chỗ 10" before "Chỗ 2". The real
+    // ordering is applied below with sortDesks (see lib/desks.ts).
+    supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true),
     supabase
       .from("registrations")
       .select("id, desk_id, date, start_time, end_time, student_name")
@@ -29,7 +32,8 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
   ])
 
   return {
-    desks: (desks ?? []) as Desk[],
+    // Desk order is the grid's column order, so it has to be numeric.
+    desks: sortDesks((desks ?? []) as Desk[]),
     registrations: (registrations ?? []).map((r) => ({
       id: r.id,
       deskId: r.desk_id,

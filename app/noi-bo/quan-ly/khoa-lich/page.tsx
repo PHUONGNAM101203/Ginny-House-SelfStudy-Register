@@ -2,13 +2,15 @@ import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { SlotLockForm } from "@/components/admin/SlotLockForm"
 import { SlotLockTable } from "@/components/admin/SlotLockTable"
+import { sortDesks } from "@/lib/desks"
 
 export default async function SlotLockPage() {
   await requireAdmin()
   const supabase = await createServerClient()
   const [{ data: branches }, { data: desks }, { data: locks }] = await Promise.all([
     supabase.from("branches").select("id, name").order("name"),
-    supabase.from("desks").select("id, branch_id, label").order("label"),
+    // Sorted in TS below, not by SQL — see lib/desks.ts ("Chỗ 10" vs "Chỗ 2").
+    supabase.from("desks").select("id, branch_id, label"),
     supabase
       .from("slot_locks")
       .select("id, day_of_week, start_time, end_time, reason, branches(name), desks(label)")
@@ -33,7 +35,9 @@ export default async function SlotLockPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Khoá / mở lịch</h1>
-      <SlotLockForm branches={branches ?? []} desks={desks ?? []} />
+      {/* SlotLockForm already narrows this list to the selected branch, so a
+          plain desk-number sort is enough here. */}
+      <SlotLockForm branches={branches ?? []} desks={sortDesks(desks ?? [])} />
       <SlotLockTable locks={rows} />
     </div>
   )
