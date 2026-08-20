@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
 import { createRegistrationSchema, cancelRegistrationSchema } from "@/lib/validations/registration"
 import type { ActionResult } from "@/types"
+import { requireAdmin } from "@/lib/auth"
+import { createServerClient } from "@/lib/supabase/server"
 
 export async function createRegistrationAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = createRegistrationSchema.safeParse(input)
@@ -61,4 +63,33 @@ export async function cancelRegistrationAction(input: unknown): Promise<ActionRe
 
   revalidatePath("/")
   return { ok: true, data: null }
+}
+
+export async function createRegistrationAsAdminAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  await requireAdmin()
+  const parsed = createRegistrationSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = await createServerClient()
+  const { data, error } = await supabase.rpc("create_registration", {
+    p_desk_id: parsed.data.deskId,
+    p_date: parsed.data.date,
+    p_start_time: parsed.data.startTime,
+    p_end_time: parsed.data.endTime,
+    p_full_name: parsed.data.fullName,
+    p_phone: parsed.data.phone,
+    p_is_recurring: parsed.data.isRecurring,
+    p_admin_created: true,
+  })
+
+  if (error) {
+    if (error.code === "23P01") return { ok: false, error: "Khung giờ này đã có người đặt" }
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/")
+  return { ok: true, data: { id: data.id } }
 }
