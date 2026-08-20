@@ -1,7 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { sortDesks } from "@/lib/desks"
-import { format } from "date-fns"
+import { addWeeks, format } from "date-fns"
 
 export type Desk = { id: string; label: string }
 export type RegistrationRow = { id: string; deskId: string; date: string; startTime: string; endTime: string; studentName: string }
@@ -59,6 +59,17 @@ function toHm(value: string): string {
   return `${h}:${m}`
 }
 
+// How far ahead of the current week to auto-materialize recurring bookings.
+// This is deliberately independent of MAX_YEARS_FROM_TODAY in
+// lib/schedule-params.ts, which only bounds how far a visitor may *look*
+// (navigate the `?day=` picker). Materializing is a *write* — the RPC below
+// is security-definer and anon-callable — and the recurring-booking feature
+// only needs to keep the near-term weeks filled in as time passes; there is
+// no product reason to pre-insert real registration rows years in advance.
+// Without its own bound, a visitor could walk `?day=` across every future
+// week up to the 2-year display clamp and force-insert rows for all of them.
+const MAX_MATERIALIZE_WEEKS_AHEAD = 8
+
 export async function materializeWeek(weekMonday: Date) {
   // Guard against retroactively fabricating attendance. Both the guest page and
   // /noi-bo/lich call this for whatever week the URL asks for, so browsing back
@@ -66,9 +77,12 @@ export async function materializeWeek(weekMonday: Date) {
   // past — sessions that never happened — which then poison the dashboard's
   // trend chart and frequency ranking. Materializing is only ever meaningful
   // for the current week onward.
+  const currentMonday = getMondayOfWeek(new Date())
+  const maxMonday = addWeeks(currentMonday, MAX_MATERIALIZE_WEEKS_AHEAD)
   const requested = format(weekMonday, "yyyy-MM-dd")
-  const currentWeek = format(getMondayOfWeek(new Date()), "yyyy-MM-dd")
-  if (requested < currentWeek) return
+  const currentWeek = format(currentMonday, "yyyy-MM-dd")
+  const maxWeek = format(maxMonday, "yyyy-MM-dd")
+  if (requested < currentWeek || requested > maxWeek) return
 
   const supabase = createPublicClient()
   await supabase.rpc("materialize_recurring_registrations", {
