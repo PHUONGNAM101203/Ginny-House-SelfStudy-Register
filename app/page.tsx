@@ -1,4 +1,4 @@
-import { getBranches, getScheduleData } from "@/lib/schedule-data"
+import { getBranches, getScheduleData, materializeWeek } from "@/lib/schedule-data"
 import { getMondayOfWeek } from "@/lib/week"
 import { BranchTabs } from "@/components/schedule/BranchTabs"
 import { WeekPicker } from "@/components/schedule/WeekPicker"
@@ -13,6 +13,7 @@ export default async function HomePage({
   const branches = await getBranches()
   const activeBranchId = params.branch ?? branches[0]?.id
   const monday = getMondayOfWeek(params.week ? new Date(params.week) : new Date())
+  await materializeWeek(monday)
   const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday) : null
 
   return (

@@ -51,6 +51,13 @@ function toHm(value: string): string {
   return `${h}:${m}`
 }
 
+export async function materializeWeek(weekMonday: Date) {
+  const supabase = createPublicClient()
+  await supabase.rpc("materialize_recurring_registrations", {
+    p_week_start: format(weekMonday, "yyyy-MM-dd"),
+  })
+}
+
 export async function getBranches() {
   const supabase = createPublicClient()
   const { data } = await supabase.from("branches").select("id, code, name").order("name")
