@@ -37,9 +37,11 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-dvh flex-1 flex-col overflow-hidden bg-primary lg:flex-row">
       <BrandMark
+        variant="white"
         className="pointer-events-none absolute -top-16 -right-24 size-[28rem] opacity-[0.06]"
       />
       <BrandMark
+        variant="white"
         className="pointer-events-none absolute -bottom-24 -left-20 size-96 rotate-12 opacity-[0.06]"
       />
 
@@ -48,7 +50,7 @@ export default function LoginPage() {
           lost when the two-column split collapses. */}
       <div className="relative z-10 hidden flex-1 flex-col items-center justify-center gap-12 px-12 py-16 lg:flex">
         <div className="flex flex-col items-center gap-3 text-center text-primary-foreground">
-          <BrandMark className="size-12" priority />
+          <BrandMark variant="white" className="size-12" priority />
           <div>
             <p className="font-heading text-3xl font-semibold tracking-tight">Ginny House</p>
             <p className="mt-1.5 text-sm text-primary-foreground/70">
@@ -61,7 +63,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-4 py-12">
         <div className="flex flex-col items-center gap-3 text-center text-primary-foreground lg:hidden">
-          <BrandMark className="size-10" priority />
+          <BrandMark variant="white" className="size-10" priority />
           <div>
             <p className="font-heading text-2xl font-semibold tracking-tight">Ginny House</p>
             <p className="mt-1 text-sm text-primary-foreground/70">

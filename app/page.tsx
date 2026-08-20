@@ -3,6 +3,8 @@ import { getMondayOfWeek } from "@/lib/week"
 import { BranchTabs } from "@/components/schedule/BranchTabs"
 import { WeekPicker } from "@/components/schedule/WeekPicker"
 import { ScheduleGridClient } from "@/components/schedule/ScheduleGridClient"
+import { ThemeToggle } from "@/components/layout/ThemeToggle"
+import BrandMark from "@/components/brand/BrandMark"
 
 export default async function HomePage({
   searchParams,
@@ -17,8 +19,21 @@ export default async function HomePage({
   const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday) : null
 
   return (
-    <div className="mx-auto max-w-6xl p-4">
-      <h1 className="mb-4 text-xl font-semibold">Đăng ký chỗ tự học</h1>
+    // w-full min-w-0: this div is a flex item of <body className="flex h-full
+    // flex-col"> (app/layout.tsx). Flex items default to min-width: auto,
+    // which refuses to shrink below their content's min-content size — the
+    // desk-column calendar grid's intrinsic width is much wider than a phone
+    // viewport, so without an explicit width the whole *page* scrolled
+    // horizontally instead of just each day's own overflow-x-auto wrapper
+    // (found while re-verifying mobile width for Task 8b's dark-mode fix).
+    <div className="mx-auto w-full min-w-0 max-w-6xl p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BrandMark className="size-8" priority />
+          <h1 className="text-xl font-semibold">Đăng ký chỗ tự học</h1>
+        </div>
+        <ThemeToggle />
+      </div>
       <div className="mb-4 flex items-center justify-between">
         {activeBranchId && <BranchTabs branches={branches} activeBranchId={activeBranchId} />}
         <WeekPicker monday={monday} />

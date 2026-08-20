@@ -361,3 +361,109 @@
   }
 }
 
+/* ---- react-big-calendar overrides (desk-booking resource grid) ----
+   Scoped to .schedule-grid-calendar (ScheduleGrid's wrapper) rather than a
+   blanket .rbc-* rule — Task 14 is expected to add a second, unrelated RBC
+   instance (an internal shift/booking calendar) later, and this grid's rules
+   (locked-slot greying, no "today" tint) are specific to a fixed weekly
+   desk-availability view, not a general-purpose calendar. Ported from the
+   reference app's own .rbc-* block (Calendar-GInny-House/app/globals.css)
+   — only the parts that apply to a resource-column day grid; the shift
+   calendar's event-type color variants (leave, attendance, holiday, …) have
+   no equivalent here. */
+.schedule-grid-calendar .rbc-calendar {
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+/* Same rationale as the reference app: don't tint the whole "today" column,
+   it reads as noise against a weekly grid that already labels each day. */
+.schedule-grid-calendar .rbc-today {
+  background-color: transparent;
+}
+/* Current-time line, only visible on whichever day instance is actually
+   today and within that block's min/max window — same red marker language
+   as --destructive uses elsewhere in this app. */
+.schedule-grid-calendar .rbc-current-time-indicator {
+  height: 2px;
+  background-color: var(--destructive);
+}
+/* Every grid line (hour rows, resource-column dividers, header rule) uses
+   the softer --calendar-grid token instead of RBC's default high-contrast
+   border — see the reference app's identical rule for why this needs a
+   blanket descendant selector rather than naming each rbc-* class. */
+.schedule-grid-calendar .rbc-calendar,
+.schedule-grid-calendar .rbc-calendar * {
+  border-color: var(--calendar-grid) !important;
+}
+.schedule-grid-calendar .rbc-header {
+  padding: 6px 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.schedule-grid-calendar .rbc-time-gutter .rbc-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  padding: 0 8px;
+}
+.schedule-grid-calendar .rbc-show-more {
+  color: var(--primary);
+  background: transparent;
+  font-weight: 500;
+}
+/* Booking chips — every event rendered in this grid is an active
+   registration, so style .rbc-event directly rather than adding an
+   eventPropGetter className (there's only ever one visual "kind" of event
+   here, unlike the reference app's multi-type shift calendar). Mirrors the
+   old SlotCell "booked" look: primary-tinted fill, no border noise. */
+.schedule-grid-calendar .rbc-event {
+  background-color: color-mix(in oklch, var(--primary) 12%, var(--card));
+  color: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+.schedule-grid-calendar .rbc-selected.rbc-event {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+/* Locked slots — static, no transition/animation (nothing to affirm by
+   moving): a flat muted fill plus not-allowed cursor is the whole
+   affordance. Enforcement of the click-reject happens in ScheduleGrid's
+   onSelectSlot handler; this class is visual only. */
+.schedule-grid-calendar .rbc-slot-locked {
+  background-color: var(--muted);
+  cursor: not-allowed;
+}
+/* The stock stylesheet hardcodes light-mode backgrounds in a few places
+   (checked directly against node_modules/react-big-calendar/lib/css/
+   react-big-calendar.css rather than assumed from memory — see the task-8b
+   fix report for the full audit). Two are reachable from this resource-view
+   day grid and read as a stray white stripe/panel in dark mode:
+   - `.rbc-time-view-resources .rbc-time-gutter` /
+     `.rbc-time-view-resources .rbc-time-header-gutter` (line ~512-516 in the
+     stock sheet): `background-color: white` on the sticky time-label column.
+     `.rbc-time-view-resources` is always applied here since this component
+     always passes `resources={desks}` — this rule always fires, and was
+     visible as a solid white block behind the "08:00, 08:30, …" labels
+     during dark-mode verification.
+   - `.rbc-overlay` (line ~336): `background-color: #fff` on the "+N more"
+     popup RBC shows when a resource column has more events than fit —
+     doesn't come up in normal use (this app allows at most one booking per
+     desk per slot) but is fixed for completeness since it's still reachable.
+   `.rbc-show-more`'s own hardcoded `rgba(255,255,255,0.3)` background (line
+   ~218) needed no separate fix — the `.schedule-grid-calendar .rbc-show-more`
+   rule above already sets `background: transparent` and wins on
+   specificity. */
+.schedule-grid-calendar .rbc-time-view-resources .rbc-time-gutter,
+.schedule-grid-calendar .rbc-time-view-resources .rbc-time-header-gutter {
+  background-color: var(--background);
+}
+.schedule-grid-calendar .rbc-overlay {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+

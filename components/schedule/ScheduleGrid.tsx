@@ -1,10 +1,12 @@
 "use client"
 
-import { format } from "date-fns"
-import { TIME_SLOTS } from "@/lib/time-slots"
+import { useMemo } from "react"
+import { Calendar, dateFnsLocalizer, type SlotInfo } from "react-big-calendar"
+import { format, startOfWeek, getDay, addMinutes, setHours, setMinutes } from "date-fns"
+import { vi } from "date-fns/locale"
 import { getWeekDates } from "@/lib/week"
-import { SlotCell } from "@/components/schedule/SlotCell"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
+import "react-big-calendar/lib/css/react-big-calendar.css"
 
 export type SlotClickPayload = {
   desk: Desk
@@ -14,13 +16,49 @@ export type SlotClickPayload = {
   registration?: RegistrationRow
 }
 
+type BookingEvent = {
+  id: string
+  title: string
+  start: Date
+  end: Date
+  resourceId: string
+  registration: RegistrationRow
+}
+
+// RBC's dateFnsLocalizer only ever calls `format`, `startOfWeek`, and `getDay`
+// internally (verified against the installed package) — `parse` is commonly
+// imported alongside by convention but is unused here, so it's omitted.
+const localizer = dateFnsLocalizer({
+  format,
+  startOfWeek,
+  getDay,
+  locales: { vi },
+})
+
+// Minimal message overrides: `toolbar={false}` removes RBC's own nav bar (this
+// app already has BranchTabs/WeekPicker), so previous/next/today never render.
+// Only translate strings that can actually surface in a resource day view.
+const messages = {
+  allDay: "Cả ngày",
+  noEventsInRange: "Không có lịch đặt nào",
+  showMore: (total: number) => `+${total} nữa`,
+}
+
+const MORNING = { start: "08:00", end: "12:00" }
+const AFTERNOON = { start: "14:00", end: "22:00" }
+
+function timeOnDate(date: Date, hm: string): Date {
+  const [h, m] = hm.split(":").map(Number)
+  return setMinutes(setHours(date, h), m)
+}
+
 export function ScheduleGrid({
   desks, monday, registrations, locks, onSlotClick,
 }: {
   desks: Desk[]; monday: Date; registrations: RegistrationRow[]; locks: SlotLock[]
   onSlotClick: (payload: SlotClickPayload) => void
 }) {
-  const dates = getWeekDates(monday)
+  const dates = useMemo(() => getWeekDates(monday), [monday])
 
   function findRegistration(deskId: string, date: string, startTime: string) {
     return registrations.find((r) => r.deskId === deskId && r.date === date && r.startTime === startTime)
@@ -33,34 +71,107 @@ export function ScheduleGrid({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="flex flex-col gap-6">
       {dates.map((date) => {
         const dateStr = format(date, "yyyy-MM-dd")
         const isoDow = ((date.getDay() + 6) % 7) + 1
+
+        const events: BookingEvent[] = registrations
+          .filter((r) => r.date === dateStr)
+          .map((r) => ({
+            id: r.id,
+            title: r.studentName,
+            start: timeOnDate(date, r.startTime),
+            end: timeOnDate(date, r.endTime),
+            resourceId: r.deskId,
+            registration: r,
+          }))
+
+        function handleSelectSlot(slotInfo: SlotInfo) {
+          if (slotInfo.resourceId == null) return
+          const deskId = String(slotInfo.resourceId)
+          const desk = desks.find((d) => d.id === deskId)
+          if (!desk) return
+          const startTime = format(slotInfo.start, "HH:mm")
+          const endTime = format(slotInfo.end, "HH:mm")
+          // Enforcement lives here, not in slotPropGetter — the CSS class RBC
+          // renders for a locked slot is visual only, it does not stop clicks.
+          if (isLocked(deskId, isoDow, startTime, endTime)) return
+          const registration = findRegistration(deskId, dateStr, startTime)
+          onSlotClick({ desk, date: dateStr, startTime, endTime, registration })
+        }
+
+        function handleSelectEvent(event: BookingEvent) {
+          const desk = desks.find((d) => d.id === event.resourceId)
+          if (!desk) return
+          onSlotClick({
+            desk,
+            date: dateStr,
+            startTime: event.registration.startTime,
+            endTime: event.registration.endTime,
+            registration: event.registration,
+          })
+        }
+
+        function slotPropGetter(slotDate: Date, resourceId?: string | number) {
+          if (resourceId == null) return {}
+          const deskId = String(resourceId)
+          const startTime = format(slotDate, "HH:mm")
+          const endTime = format(addMinutes(slotDate, 30), "HH:mm")
+          // `slot-${deskId}-${startTime}` is a stable hook for the future E2E
+          // test task — RBC's slotPropGetter return type has no data-* support,
+          // so a className is used in place of the old SlotCell's data-testid.
+          const baseClassName = `slot-${deskId}-${startTime}`
+          if (isLocked(deskId, isoDow, startTime, endTime)) {
+            return { className: `${baseClassName} rbc-slot-locked` }
+          }
+          return { className: baseClassName }
+        }
+
         return (
-          <div key={dateStr} className="mb-6">
-            <h3 className="mb-2 text-sm font-medium">{format(date, "EEEE dd/MM")}</h3>
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${desks.length}, minmax(60px, 1fr))` }}>
-              {desks.map((desk) => (
-                <div key={desk.id} className="flex flex-col gap-1">
-                  <span className="text-center text-xs text-muted-foreground">{desk.label}</span>
-                  {TIME_SLOTS.map((slot) => {
-                    const registration = findRegistration(desk.id, dateStr, slot.start)
-                    const locked = !registration && isLocked(desk.id, isoDow, slot.start, slot.end)
-                    const state = registration ? "booked" : locked ? "locked" : "free"
-                    return (
-                      <SlotCell
-                        key={slot.start}
-                        slot={slot}
-                        state={state}
-                        registration={registration}
-                        onClick={() =>
-                          onSlotClick({ desk, date: dateStr, startTime: slot.start, endTime: slot.end, registration })
-                        }
-                      />
-                    )
+          // min-w-0: this div is a flex item of the flex-col container just
+          // below (a fresh gotcha per day-instance, same root cause as
+          // app/page.tsx's outer wrapper — see the comment there). Without
+          // it, this per-day overflow-x-auto div refuses to shrink below the
+          // calendar's intrinsic content width, so the horizontal scroll
+          // leaks out to the page instead of staying contained here.
+          <div key={dateStr} className="min-w-0 overflow-x-auto">
+            <h3 className="mb-2 text-sm font-medium text-foreground">{format(date, "EEEE dd/MM", { locale: vi })}</h3>
+            <div className="schedule-grid-calendar min-w-fit rounded-md border border-border">
+              {[MORNING, AFTERNOON].map((range) => (
+                <Calendar<BookingEvent, Desk>
+                  key={range.start}
+                  localizer={localizer}
+                  culture="vi"
+                  messages={messages}
+                  // Each stacked instance only gets events that start inside
+                  // its own [min, max) window — without this filter, a
+                  // morning booking passed to the afternoon instance (or vice
+                  // versa) falls outside that instance's visible range and
+                  // RBC bumps it into the header/all-day row instead of
+                  // hiding it, which reads as a stray duplicate chip.
+                  events={events.filter((e) => {
+                    const t = format(e.start, "HH:mm")
+                    return t >= range.start && t < range.end
                   })}
-                </div>
+                  resources={desks}
+                  resourceIdAccessor="id"
+                  resourceTitleAccessor="label"
+                  defaultDate={date}
+                  date={date}
+                  view="day"
+                  views={["day"]}
+                  toolbar={false}
+                  selectable
+                  step={30}
+                  timeslots={1}
+                  min={timeOnDate(date, range.start)}
+                  max={timeOnDate(date, range.end)}
+                  onSelectSlot={handleSelectSlot}
+                  onSelectEvent={handleSelectEvent}
+                  slotPropGetter={slotPropGetter}
+                  style={{ height: range === MORNING ? 340 : 620 }}
+                />
               ))}
             </div>
           </div>
