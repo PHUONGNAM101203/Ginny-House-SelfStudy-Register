@@ -46,9 +46,12 @@ export function SlotLockForm({ branches, desks }: { branches: Branch[]; desks: D
       <NativeSelect aria-label="Thứ" value={form.dayOfWeek} onChange={(e) => setForm({ ...form, dayOfWeek: Number(e.target.value) })}>
         {Object.entries(DAY_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
       </NativeSelect>
-      <Input type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-      <Input type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-      <Input placeholder="Lý do (tuỳ chọn)" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+      {/* `Input` is w-full, so on a wrapping row each one claimed a whole line
+          and a 1400px-wide box held "08:00". Explicit widths from `sm` up keep
+          the form one compact row on a desktop; still full-width on a phone. */}
+      <Input aria-label="Giờ bắt đầu" type="time" className="sm:w-28" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+      <Input aria-label="Giờ kết thúc" type="time" className="sm:w-28" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+      <Input placeholder="Lý do (tuỳ chọn)" className="sm:w-56" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
       <Button onClick={submit}>Khoá</Button>
     </div>
   )

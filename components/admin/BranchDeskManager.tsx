@@ -42,8 +42,8 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
         {/* Inputs are `w-full min-w-0`, so on one row at 320px they shrank to
             ~110px each — narrower than their own placeholders. */}
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-          <Input placeholder="Mã (vd: hoang-gia)" value={newBranch.code} onChange={(e) => setNewBranch({ ...newBranch, code: e.target.value })} />
-          <Input placeholder="Tên cơ sở" value={newBranch.name} onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })} />
+          <Input placeholder="Mã (vd: hoang-gia)" className="sm:w-48" value={newBranch.code} onChange={(e) => setNewBranch({ ...newBranch, code: e.target.value })} />
+          <Input placeholder="Tên cơ sở" className="sm:w-56" value={newBranch.name} onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })} />
           <Button onClick={addBranch}>Thêm</Button>
         </div>
         <Table>
@@ -65,7 +65,7 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
           <NativeSelect aria-label="Cơ sở" value={newDesk.branchId} onChange={(e) => setNewDesk({ ...newDesk, branchId: e.target.value })}>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </NativeSelect>
-          <Input placeholder="Tên chỗ (vd: Chỗ 11)" value={newDesk.label} onChange={(e) => setNewDesk({ ...newDesk, label: e.target.value })} />
+          <Input placeholder="Tên chỗ (vd: Chỗ 11)" className="sm:w-56" value={newDesk.label} onChange={(e) => setNewDesk({ ...newDesk, label: e.target.value })} />
           <Button onClick={addDesk}>Thêm</Button>
         </div>
         <Table>

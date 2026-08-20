@@ -22,9 +22,11 @@ export function StaffForm() {
     // content, so on a 320px screen an inline row left each one too narrow to
     // read its own placeholder.
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-      <Input placeholder="Họ tên" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-      <Input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <Input placeholder="Mật khẩu" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      {/* Explicit widths from `sm` up: `Input` is w-full, so on a wrapping row
+          each one otherwise claimed a whole line even on a wide screen. */}
+      <Input placeholder="Họ tên" className="sm:w-44" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+      <Input placeholder="Email" type="email" className="sm:w-56" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <Input placeholder="Mật khẩu" type="password" className="sm:w-44" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
       <NativeSelect
         aria-label="Vai trò"
         value={form.role}
