@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { sortDesks } from "@/lib/desks"
+import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { addWeeks, format } from "date-fns"
 
 export type Desk = { id: string; label: string }
@@ -77,7 +78,7 @@ export async function materializeWeek(weekMonday: Date) {
   // past — sessions that never happened — which then poison the dashboard's
   // trend chart and frequency ranking. Materializing is only ever meaningful
   // for the current week onward.
-  const currentMonday = getMondayOfWeek(new Date())
+  const currentMonday = getMondayOfWeek(parseYmd(vietnamToday()))
   const maxMonday = addWeeks(currentMonday, MAX_MATERIALIZE_WEEKS_AHEAD)
   const requested = format(weekMonday, "yyyy-MM-dd")
   const currentWeek = format(currentMonday, "yyyy-MM-dd")

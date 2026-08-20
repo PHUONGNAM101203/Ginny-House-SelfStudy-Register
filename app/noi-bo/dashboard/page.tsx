@@ -1,6 +1,7 @@
 import { requireProfile } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
+import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { computeOccupancy, findMissingRegistrations, computeFrequencyRanking } from "@/lib/dashboard"
 import { OccupancyChart } from "@/components/dashboard/OccupancyChart"
 import { MissingRegistrationsList } from "@/components/dashboard/MissingRegistrationsList"
@@ -46,7 +47,7 @@ function toDayMonth(dateStr: string): string {
 export default async function DashboardPage() {
   await requireProfile()
   const supabase = await createServerClient()
-  const monday = getMondayOfWeek(new Date())
+  const monday = getMondayOfWeek(parseYmd(vietnamToday()))
   const weekDates = getWeekDates(monday).map((d) => format(d, "yyyy-MM-dd"))
   const eightWeeksAgo = format(subWeeks(monday, 8), "yyyy-MM-dd")
 
