@@ -14,6 +14,8 @@ export function AppHeader({ profile }: { profile: Profile }) {
             <>
               <Link href="/noi-bo/quan-ly/co-so" className="text-sm text-muted-foreground">Quản lý</Link>
               <Link href="/noi-bo/quan-ly/khoa-lich" className="text-sm text-muted-foreground">Khoá lịch</Link>
+              <Link href="/noi-bo/quan-ly/hoc-sinh" className="text-sm text-muted-foreground">Học sinh</Link>
+              <Link href="/noi-bo/quan-ly/nhan-su" className="text-sm text-muted-foreground">Nhân sự</Link>
             </>
           )}
         </div>
