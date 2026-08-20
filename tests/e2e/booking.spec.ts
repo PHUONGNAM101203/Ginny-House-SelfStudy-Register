@@ -119,10 +119,22 @@ test("day navigation moves the grid by step button, week strip and date picker",
   await dateButton.click()
   const picker = page.getByRole("dialog")
   await expect(picker).toBeVisible()
+  // The month and year labels swap the whole panel to a month grid / year grid
+  // inside the same popover, and picking one returns to the day grid (see
+  // components/schedule/DatePickerPanel.tsx). They are real buttons in the
+  // document, not the native <select> overlays this picker used to use — those
+  // rendered their list as an OS widget outside the popover entirely.
+  //
   // Year first, then month: +40 days can cross a year boundary in December,
-  // and the month dropdown only moves within the displayed year.
-  await picker.getByRole("combobox", { name: "Choose the Year" }).selectOption(String(distant.getFullYear()))
-  await picker.getByRole("combobox", { name: "Choose the Month" }).selectOption({ index: distant.getMonth() })
+  // and the month grid only moves within the displayed year.
+  await picker.getByRole("button", { name: /^Chọn năm —/ }).click()
+  await picker
+    .getByRole("group", { name: "Chọn năm" })
+    .getByRole("button", { name: String(distant.getFullYear()), exact: true })
+    .click()
+  // Back on the day grid, so the month label has to be reopened.
+  await picker.getByRole("button", { name: /^Chọn tháng —/ }).click()
+  await picker.getByRole("group", { name: "Chọn tháng" }).getByRole("button").nth(distant.getMonth()).click()
   await picker.getByRole("button", { name: new RegExp(`ngày ${distant.getDate()} tháng`) }).first().click()
   await expect(dateButton).toContainText(format(distant, "dd/MM/yyyy"))
   await expect(page).toHaveURL(new RegExp(`day=${format(distant, "yyyy-MM-dd")}`))

@@ -6,7 +6,7 @@ import { addDays, addYears, format } from "date-fns"
 import { vi } from "date-fns/locale"
 import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { DatePickerPanel } from "@/components/schedule/DatePickerPanel"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { parseYmd, toYmd, vietnamToday } from "@/lib/vn-date"
@@ -111,29 +111,19 @@ export function DateNavigator({
                 <ChevronDownIcon data-icon="inline-end" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-auto p-0">
-              <Calendar
-                mode="single"
-                locale={vi}
-                weekStartsOn={1}
+            {/* Fixed width (the PopoverContent default) rather than w-auto:
+                the panel swaps between a day grid, a month grid and a year
+                grid, and a shrink-to-fit popover would resize and re-anchor
+                itself on every swap. */}
+            <PopoverContent align="end" className="p-2">
+              <DatePickerPanel
                 selected={selectedDate}
-                defaultMonth={selectedDate}
-                // Month + year become dropdowns instead of a static caption, so
-                // a distant date is two clicks away rather than N arrow presses.
-                captionLayout="dropdown"
-                // Bounded to exactly the window lib/schedule-params.ts clamps
-                // to, so the picker can never offer a date the server bounces
-                // back to today. startMonth/endMonth are month-granular, hence
-                // the `disabled` matcher for the partial first/last months.
-                startMonth={rangeStart}
-                endMonth={rangeEnd}
-                disabled={{ before: rangeStart, after: rangeEnd }}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
                 onSelect={(date) => {
-                  if (!date) return
                   setPickerOpen(false)
                   goTo(date)
                 }}
-                autoFocus
               />
             </PopoverContent>
           </Popover>
