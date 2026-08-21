@@ -219,9 +219,14 @@ export function ScheduleGrid({
       // clicks by — RBC's slotPropGetter return type has no data-* support, so a
       // className stands in for a data-testid.
       const baseClassName = `slot-${deskId}-${startTime}`
-      // The boundary row (see slotCount()) always renders styled and blocked
-      // like an admin-locked slot, regardless of any real lock row in the DB.
-      if (startTime === blockEnd || isLocked(deskId, startTime, endTime)) {
+      // The boundary row (see slotCount()) is always blocked from booking —
+      // handleSelectSlot rejects it regardless of this className — but it
+      // renders with no special styling, matching every real bookable row's
+      // color exactly. It exists only to give block.end a real, native
+      // label; visually singling it out as "locked" would misrepresent it
+      // as a slot that's merely unavailable today rather than one that was
+      // never bookable.
+      if (startTime !== blockEnd && isLocked(deskId, startTime, endTime)) {
         return { className: `${baseClassName} rbc-slot-locked` }
       }
       return { className: baseClassName }
