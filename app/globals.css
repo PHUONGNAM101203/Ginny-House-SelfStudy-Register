@@ -499,14 +499,22 @@
    Plain document flow, not absolutely positioned: an earlier version pinned
    this to the calendar box's own bottom edge, which put it in the same
    stacking context as RBC's sticky resource header and let the two paint on
-   top of each other. A normal block element can never overlap anything. */
+   top of each other. A normal block element can never overlap anything.
+   width: var(--rbc-gutter-width) + text-align: right reproduces exactly how
+   a real .rbc-label sits inside .rbc-time-gutter (content-driven width,
+   right-aligned text) — ScheduleGrid.tsx's ResizeObserver sets that variable
+   from the gutter's own measured width, so this box is never a guessed
+   pixel value that could drift out of sync with it. */
 .schedule-grid-calendar .rbc-end-marker {
+  width: var(--rbc-gutter-width, 3rem);
   margin: 0 0 1.25rem;
   padding: 4px 8px 0;
   border-top: 1px solid var(--calendar-grid);
   font-size: 0.7rem;
   font-weight: 500;
   color: var(--muted-foreground);
+  text-align: right;
+  box-sizing: border-box;
 }
 .schedule-grid-calendar .rbc-show-more {
   color: var(--primary);

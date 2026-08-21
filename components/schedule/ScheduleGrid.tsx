@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Calendar, dateFnsLocalizer, type SlotInfo } from "react-big-calendar"
 import { format, startOfWeek, getDay, addMinutes, setHours, setMinutes } from "date-fns"
 import { vi } from "date-fns/locale"
@@ -226,77 +227,134 @@ export function ScheduleGrid({
       <div className="min-w-0 overflow-x-auto rounded-lg border border-border">
         <div className="schedule-grid-calendar min-w-fit">
           {BLOCKS.map((block) => (
-            <section
+            <ScheduleBlockSection
               key={block.key}
-              aria-label={`${block.label} — ${format(date, "dd/MM/yyyy")}`}
-              // The block's row count, not a pixel height: app/globals.css
-              // multiplies it by the same --rbc-slot-row that sizes an actual
-              // row, so the container is exactly as tall as its content by
-              // construction and cannot drift out of sync the way the two
-              // hardcoded heights did. See slotCount() above.
-              style={{ "--rbc-slot-count": slotCount(block) } as React.CSSProperties}
-            >
-              {/* sticky left-0 w-fit: the block label stays readable while the
-                  desk columns scroll sideways underneath it. */}
-              <h3 className="sticky left-0 w-fit px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {block.label} · {block.start}–{block.end}
-              </h3>
-              <Calendar<BookingEvent, Desk>
-                localizer={localizer}
-                culture="vi"
-                messages={messages}
-                // Each stacked instance only gets events that start inside its own
-                // [min, max) window — without this filter, a morning booking passed
-                // to the afternoon instance (or vice versa) falls outside that
-                // instance's visible range and RBC bumps it into the header/all-day
-                // row instead of hiding it, which reads as a stray duplicate chip.
-                events={events.filter((e) => {
-                  const t = format(e.start, "HH:mm")
-                  return t >= block.start && t < block.end
-                })}
-                resources={desks}
-                resourceIdAccessor="id"
-                resourceTitleAccessor="label"
-                defaultDate={date}
-                date={date}
-                view="day"
-                views={["day"]}
-                // RBC's own toolbar stays off: navigation is DateNavigator, which
-                // sits outside this horizontally scrolling container so it never
-                // scrolls off screen on a phone (and would otherwise have to
-                // render twice, once per stacked instance).
-                toolbar={false}
-                selectable
-                step={30}
-                timeslots={1}
-                min={timeOnDate(date, block.start)}
-                max={timeOnDate(date, block.end)}
-                // Pin RBC's mount-time auto-scroll to the top of our own range.
-                // RBC defaults scrollToTime to ~the current time of day, so in
-                // componentDidMount it scrolled .rbc-time-content down by ~56px
-                // (1.4 slots) *after* first paint. Two consequences: the first
-                // slot row started out hidden under the header, and a click that
-                // landed in that post-paint window was resolved by RBC against
-                // geometry that had shifted under the pointer — which is the real
-                // cause of the "booked the adjacent slot" flakiness recorded in
-                // tests/e2e/booking.spec.ts. Our min/max already frame exactly the
-                // range we want visible, so there is nothing to scroll to.
-                scrollToTime={timeOnDate(date, block.start)}
-                onSelectSlot={handleSelectSlot}
-                onSelectEvent={handleSelectEvent}
-                slotPropGetter={slotPropGetter}
-              />
-              {/* The end boundary RBC never labels on its own — a plain
-                  in-flow element (not absolutely positioned) so it can never
-                  overlap the next block's sticky header, whatever width RBC
-                  computes for its own gutter column. */}
-              <p className="rbc-end-marker" aria-hidden="true">
-                {block.end}
-              </p>
-            </section>
+              block={block}
+              date={date}
+              events={events}
+              desks={desks}
+              handleSelectSlot={handleSelectSlot}
+              handleSelectEvent={handleSelectEvent}
+              slotPropGetter={slotPropGetter}
+            />
           ))}
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * One stacked block (morning or afternoon–evening): its own RBC Calendar
+ * instance plus the closing end-time marker below it. Split out of
+ * ScheduleGrid so the marker's gutter-width sync (see the effect below) has
+ * a ref scoped to exactly this block, not a shared one across both.
+ */
+function ScheduleBlockSection({
+  block,
+  date,
+  events,
+  desks,
+  handleSelectSlot,
+  handleSelectEvent,
+  slotPropGetter,
+}: {
+  block: (typeof BLOCKS)[number]
+  date: Date
+  events: BookingEvent[]
+  desks: Desk[]
+  handleSelectSlot: (slotInfo: SlotInfo) => void
+  handleSelectEvent: (event: BookingEvent) => void
+  slotPropGetter: (slotDate: Date, resourceId?: string | number) => { className?: string }
+}) {
+  const sectionRef = useRef<HTMLElement>(null)
+
+  // RBC sizes .rbc-time-gutter to shrink-wrap its own label text (see
+  // TimeGutter.js — there's no CSS hook for that width, it's pure
+  // content-driven auto-sizing). The end-time marker below the grid needs
+  // that exact width to right-align inside a matching box, the same way
+  // every real "HH:MM" label does — a hardcoded pixel guess drifted the
+  // moment the marker's box didn't match the gutter's, which is what read
+  // as "misaligned, not synced with the calendar". Mirroring the real,
+  // measured width is the only way that's actually guaranteed to match.
+  useEffect(() => {
+    const section = sectionRef.current
+    const gutter = section?.querySelector<HTMLElement>(".rbc-time-gutter")
+    if (!section || !gutter) return
+    const sync = () => section.style.setProperty("--rbc-gutter-width", `${gutter.getBoundingClientRect().width}px`)
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(gutter)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <section
+      ref={sectionRef}
+      aria-label={`${block.label} — ${format(date, "dd/MM/yyyy")}`}
+      // The block's row count, not a pixel height: app/globals.css
+      // multiplies it by the same --rbc-slot-row that sizes an actual
+      // row, so the container is exactly as tall as its content by
+      // construction and cannot drift out of sync the way the two
+      // hardcoded heights did. See slotCount() above.
+      style={{ "--rbc-slot-count": slotCount(block) } as React.CSSProperties}
+    >
+      {/* sticky left-0 w-fit: the block label stays readable while the
+          desk columns scroll sideways underneath it. */}
+      <h3 className="sticky left-0 w-fit px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {block.label} · {block.start}–{block.end}
+      </h3>
+      <Calendar<BookingEvent, Desk>
+        localizer={localizer}
+        culture="vi"
+        messages={messages}
+        // Each stacked instance only gets events that start inside its own
+        // [min, max) window — without this filter, a morning booking passed
+        // to the afternoon instance (or vice versa) falls outside that
+        // instance's visible range and RBC bumps it into the header/all-day
+        // row instead of hiding it, which reads as a stray duplicate chip.
+        events={events.filter((e) => {
+          const t = format(e.start, "HH:mm")
+          return t >= block.start && t < block.end
+        })}
+        resources={desks}
+        resourceIdAccessor="id"
+        resourceTitleAccessor="label"
+        defaultDate={date}
+        date={date}
+        view="day"
+        views={["day"]}
+        // RBC's own toolbar stays off: navigation is DateNavigator, which
+        // sits outside this horizontally scrolling container so it never
+        // scrolls off screen on a phone (and would otherwise have to
+        // render twice, once per stacked instance).
+        toolbar={false}
+        selectable
+        step={30}
+        timeslots={1}
+        min={timeOnDate(date, block.start)}
+        max={timeOnDate(date, block.end)}
+        // Pin RBC's mount-time auto-scroll to the top of our own range.
+        // RBC defaults scrollToTime to ~the current time of day, so in
+        // componentDidMount it scrolled .rbc-time-content down by ~56px
+        // (1.4 slots) *after* first paint. Two consequences: the first
+        // slot row started out hidden under the header, and a click that
+        // landed in that post-paint window was resolved by RBC against
+        // geometry that had shifted under the pointer — which is the real
+        // cause of the "booked the adjacent slot" flakiness recorded in
+        // tests/e2e/booking.spec.ts. Our min/max already frame exactly the
+        // range we want visible, so there is nothing to scroll to.
+        scrollToTime={timeOnDate(date, block.start)}
+        onSelectSlot={handleSelectSlot}
+        onSelectEvent={handleSelectEvent}
+        slotPropGetter={slotPropGetter}
+      />
+      {/* The end boundary RBC never labels on its own — width pinned to the
+          real gutter's measured width (see the effect above) so this reads
+          as one more row in the same column, not a stray label. */}
+      <p className="rbc-end-marker" aria-hidden="true">
+        {block.end}
+      </p>
+    </section>
   )
 }
