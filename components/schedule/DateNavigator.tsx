@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useOptimistic, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { addDays, addYears, format } from "date-fns"
 import { vi } from "date-fns/locale"
@@ -45,10 +45,17 @@ export function DateNavigator({
   // or a staff member gets ejected from the internal shell on every nav.
   const pathname = usePathname()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [, startTransition] = useTransition()
+  // Switches the highlighted day (and, when it crosses a week boundary, the
+  // whole week strip) the instant it's clicked, instead of waiting on the
+  // server round-trip that refetches the target day's schedule —
+  // selectedDateStr only updates once that response lands, which read as
+  // every click "lagging" behind the tap.
+  const [optimisticSelectedDateStr, setOptimisticSelectedDateStr] = useOptimistic(selectedDateStr)
 
   // Rebuilt as *local* midnight on whichever side is rendering. Both sides
   // start from the same string, so SSR and hydration always agree.
-  const selectedDate = parseYmd(selectedDateStr)
+  const selectedDate = parseYmd(optimisticSelectedDateStr)
   // "Today" is Vietnam's today, not the device's — the branch's day is the one
   // that matters, and it must match the clock in the header.
   const todayStr = vietnamToday()
@@ -61,10 +68,32 @@ export function DateNavigator({
     // alongside `day`: jumping to a date in another week re-fetches that week
     // without any extra client round trip.
     next.set("week", toYmd(getMondayOfWeek(date)))
-    router.push(`${pathname}?${next.toString()}`)
+    const href = `${pathname}?${next.toString()}`
+    startTransition(() => {
+      setOptimisticSelectedDateStr(toYmd(date))
+      router.push(href)
+    })
   }
 
-  const isToday = selectedDateStr === todayStr
+  // The 7 days already in view are the cheap jumps — plus the day on either
+  // side (crossing into an adjacent week, e.g. clicking prev from a Monday)
+  // and "today" (the Hôm nay target, which can be far outside the visible
+  // week). Warming the router cache for all of them on mount means the
+  // actual click almost always hits an already-fetched page.
+  useEffect(() => {
+    const targets = [...weekDates, addDays(selectedDate, -1), addDays(selectedDate, 1), parseYmd(todayStr)]
+    for (const date of targets) {
+      const next = new URLSearchParams(params)
+      next.set("day", toYmd(date))
+      next.set("week", toYmd(getMondayOfWeek(date)))
+      router.prefetch(`${pathname}?${next.toString()}`)
+    }
+    // Re-runs only when the visible week or base path actually changes, not
+    // on every keystroke of an unrelated search param.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, toYmd(weekDates[0]), todayStr])
+
+  const isToday = optimisticSelectedDateStr === todayStr
   const rangeStart = addYears(parseYmd(todayStr), -MAX_YEARS_FROM_TODAY)
   const rangeEnd = addYears(parseYmd(todayStr), MAX_YEARS_FROM_TODAY)
 
@@ -153,7 +182,7 @@ export function DateNavigator({
       >
         {weekDates.map((date) => {
           const dateStr = toYmd(date)
-          const selected = dateStr === selectedDateStr
+          const selected = dateStr === optimisticSelectedDateStr
           const isCurrentDay = dateStr === todayStr
           return (
             <button

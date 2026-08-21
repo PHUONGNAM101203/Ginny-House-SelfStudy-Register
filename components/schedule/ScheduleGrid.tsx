@@ -286,6 +286,13 @@ export function ScheduleGrid({
                 onSelectEvent={handleSelectEvent}
                 slotPropGetter={slotPropGetter}
               />
+              {/* The end boundary RBC never labels on its own — a plain
+                  in-flow element (not absolutely positioned) so it can never
+                  overlap the next block's sticky header, whatever width RBC
+                  computes for its own gutter column. */}
+              <p className="rbc-end-marker" aria-hidden="true">
+                {block.end}
+              </p>
             </section>
           ))}
         </div>
