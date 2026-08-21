@@ -26,9 +26,14 @@ export function AppHeader({ profile }: { profile: Profile | null }) {
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/70 sm:px-6">
-      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 items-center gap-2 text-primary">
+      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 shrink-0 items-center gap-2 text-primary">
         <BrandMark className="size-6 shrink-0" priority />
-        <span className="truncate text-lg leading-none font-semibold tracking-tight">Ginny House</span>
+        {/* Hidden rather than truncated below sm: the internal header's
+            right-side cluster (calendar/launcher/theme/avatar) leaves so
+            little room on a phone that "Ginny House" truncated to "G.." —
+            illegible, not just tight. The icon alone still carries the
+            brand at that width. */}
+        <span className="hidden text-lg leading-none font-semibold tracking-tight sm:inline">Ginny House</span>
       </Link>
 
       <div className="flex items-center gap-2 sm:gap-3">
