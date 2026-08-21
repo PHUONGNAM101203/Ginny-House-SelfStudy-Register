@@ -17,13 +17,6 @@ const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
   hour12: false,
 })
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
-  timeZone: TIME_ZONE,
-  weekday: "short",
-  day: "2-digit",
-  month: "2-digit",
-})
-
 /**
  * Live wall clock in Vietnam time, ticking once a second.
  *
@@ -52,24 +45,23 @@ export function VietnamClock({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-muted-foreground",
+        "flex flex-col items-center rounded-lg border border-border px-3 py-1 leading-tight",
         className
       )}
+      title="Giờ Việt Nam (GMT+7)"
       // role="timer" + the default aria-live="off" means the value is
       // readable on demand but never announced on every tick, which would
       // make a screen reader unusable.
       role="timer"
       aria-live="off"
     >
-      <ClockIcon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span className="sr-only">Giờ Việt Nam</span>
-      {/* min-w on both spans so the first tick swaps text in without resizing
-          them — AppHeader row is flex-wrap and would otherwise reflow. */}
-      <span className="hidden min-w-[5.25rem] text-xs font-medium sm:inline">
-        {now ? dateFormatter.format(now) : " "}
+      <span className="flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+        <ClockIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">Giờ Việt Nam</span>
+        <span className="min-w-[4.5rem]">{now ? timeFormatter.format(now) : "--:--:--"}</span>
       </span>
-      <span className="min-w-[4.5rem] text-xs font-semibold tabular-nums text-foreground">
-        {now ? timeFormatter.format(now) : "--:--:--"}
+      <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+        Asia/HCM · GMT+7
       </span>
     </div>
   )
