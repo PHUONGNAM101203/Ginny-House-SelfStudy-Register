@@ -5,7 +5,7 @@ import { MessageCircleIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatThread } from "@/components/chat/ChatThread"
 import { getOrCreateChatSessionAction, getGuestChatHistoryAction, sendGuestChatMessageAction } from "@/actions/chat"
-import { broadcastChatMessage, type ChatMessagePayload } from "@/lib/chat-realtime"
+import { broadcastChatMessage, broadcastStaffInboxUpdate, type ChatMessagePayload } from "@/lib/chat-realtime"
 import { isChatWindowOpen } from "@/lib/chat-window"
 
 export type GuestRegistration = {
@@ -41,7 +41,12 @@ export function GuestChatWidget({ registration }: { registration: GuestRegistrat
     if (!open || sessionId) return
     Promise.all([getOrCreateChatSessionAction(registration.id), getGuestChatHistoryAction(registration.id)]).then(
       ([sessionResult, historyResult]) => {
-        if (sessionResult.ok) setSessionId(sessionResult.data.sessionId)
+        if (sessionResult.ok) {
+          setSessionId(sessionResult.data.sessionId)
+          // Staff should see this guest as soon as they open the widget —
+          // not on a delay waiting for StaffChatWidget's own poll.
+          void broadcastStaffInboxUpdate()
+        }
         setHistory(historyResult.ok ? historyResult.data : [])
       }
     )

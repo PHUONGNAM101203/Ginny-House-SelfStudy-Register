@@ -5,7 +5,7 @@ import { MessageCircleIcon, XIcon, ChevronLeftIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatThread } from "@/components/chat/ChatThread"
 import { getActiveChatSessionsAction, getStaffChatHistoryAction, sendStaffChatMessageAction, type ActiveChatSessionRow } from "@/actions/chat"
-import { broadcastChatMessage, type ChatMessagePayload } from "@/lib/chat-realtime"
+import { broadcastChatMessage, subscribeToStaffInbox, type ChatMessagePayload } from "@/lib/chat-realtime"
 import { isChatWindowOpen } from "@/lib/chat-window"
 
 const POLL_INTERVAL_MS = 30_000
@@ -25,8 +25,17 @@ export function StaffChatWidget() {
       if (result.ok) setSessions(result.data)
     }
     refresh()
+    // The 30s poll is a fallback (covers a broadcast missed while this
+    // widget's socket was reconnecting) — the staff-inbox broadcast is what
+    // actually makes a waiting guest show up immediately instead of on a
+    // delay (see GuestChatWidget, which fires it the moment a guest opens
+    // their own widget).
     const interval = setInterval(refresh, POLL_INTERVAL_MS)
-    return () => clearInterval(interval)
+    const unsubscribe = subscribeToStaffInbox(refresh)
+    return () => {
+      clearInterval(interval)
+      unsubscribe()
+    }
   }, [])
 
   const openSessions = sessions.filter((s) => isChatWindowOpen(s.date, s.start_time, s.end_time, new Date()))
