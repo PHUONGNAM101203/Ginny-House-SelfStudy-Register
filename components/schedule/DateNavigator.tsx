@@ -32,12 +32,9 @@ const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
  */
 export function DateNavigator({
   selectedDate: selectedDateStr,
-  leading,
 }: {
   /** "yyyy-MM-dd" — a calendar day, not an instant (see lib/vn-date.ts). */
   selectedDate: string
-  /** Rendered at the start of the controls row (the branch tabs). */
-  leading?: React.ReactNode
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -105,12 +102,7 @@ export function DateNavigator({
     // so its two children and the week strip all become items of this one flex
     // row; `order-1/2/3` then puts them tabs | strip | controls.
     <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-6">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 xl:contents">
-        {/* Rendered only when there is something to put in it. An always-present
-            empty wrapper would be a zero-width first child, and `justify-between`
-            would then shove the day controls to the right edge — which is what
-            a database with no branches yet would have looked like. */}
-        {leading && <div className="min-w-0 xl:order-1">{leading}</div>}
+      <div className="flex min-w-0 flex-wrap items-center gap-2 xl:contents">
         <div className="flex flex-wrap items-center gap-2 xl:order-3">
           <Button
             variant="outline"

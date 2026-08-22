@@ -1,8 +1,13 @@
 import { getBranches, getScheduleData, materializeWeek } from "@/lib/schedule-data"
 import { resolveScheduleDates } from "@/lib/schedule-params"
+import { resolveActiveBranchId } from "@/lib/branches"
+import { getWeekDates } from "@/lib/week"
+import { toYmd } from "@/lib/vn-date"
 import { ScheduleToolbar } from "@/components/schedule/ScheduleToolbar"
 import { ScheduleGridClient } from "@/components/schedule/ScheduleGridClient"
+import { WeekOverview } from "@/components/schedule/WeekOverview"
 import { AppHeader } from "@/components/layout/AppHeader"
+import type { ScheduleView } from "@/components/schedule/ViewToggle"
 
 export default async function HomePage({
   searchParams,
@@ -10,13 +15,15 @@ export default async function HomePage({
   // string | string[]: Next hands back an array for a repeated param, so the
   // types must admit it rather than trusting a bare string (resolveScheduleDates
   // rejects the array form).
-  searchParams: Promise<{ branch?: string | string[]; week?: string | string[]; day?: string | string[] }>
+  searchParams: Promise<{ branch?: string | string[]; week?: string | string[]; day?: string | string[]; view?: string | string[] }>
 }) {
   const params = await searchParams
   const branches = await getBranches()
-  const activeBranchId = (typeof params.branch === "string" ? params.branch : undefined) ?? branches[0]?.id
+  const activeBranchId = resolveActiveBranchId(branches, params.branch)
+  const view: ScheduleView = params.view === "week" ? "week" : "day"
   // The grid shows one day; the fetch still covers that day's whole week (see
-  // lib/schedule-params.ts for why the two params always travel together).
+  // lib/schedule-params.ts for why the two params always travel together) —
+  // the week overview reuses that same fetch instead of querying again.
   const { selectedDate, monday } = resolveScheduleDates(params.day, params.week)
   await materializeWeek(monday)
   const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday) : null
@@ -33,15 +40,24 @@ export default async function HomePage({
           (found while re-verifying mobile width for Task 8b's dark-mode fix). */}
       <main className="mx-auto w-full min-w-0 max-w-[1600px] p-4">
         <h1 className="mb-4 text-xl font-semibold">Đăng ký chỗ tự học</h1>
-        <ScheduleToolbar branches={branches} activeBranchId={activeBranchId} selectedDate={selectedDate} />
-        {schedule && (
-          <ScheduleGridClient
-            desks={schedule.desks}
-            date={selectedDate}
-            registrations={schedule.registrations}
-            locks={schedule.locks}
-          />
-        )}
+        <ScheduleToolbar branches={branches} activeBranchId={activeBranchId} selectedDate={selectedDate} monday={monday} view={view} />
+        {schedule &&
+          (view === "week" ? (
+            <WeekOverview
+              desks={schedule.desks}
+              registrations={schedule.registrations}
+              locks={schedule.locks}
+              weekDates={getWeekDates(monday).map(toYmd)}
+              branchId={activeBranchId}
+            />
+          ) : (
+            <ScheduleGridClient
+              desks={schedule.desks}
+              date={selectedDate}
+              registrations={schedule.registrations}
+              locks={schedule.locks}
+            />
+          ))}
       </main>
     </>
   )
