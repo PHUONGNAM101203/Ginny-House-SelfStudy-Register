@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { sortDesks } from "@/lib/desks"
+import { sortBranchesDefaultFirst } from "@/lib/branches"
 import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { addWeeks, format } from "date-fns"
 
@@ -94,5 +95,5 @@ export async function materializeWeek(weekMonday: Date) {
 export async function getBranches() {
   const supabase = createPublicClient()
   const { data } = await supabase.from("branches").select("id, code, name").order("name")
-  return data ?? []
+  return sortBranchesDefaultFirst(data ?? [])
 }
