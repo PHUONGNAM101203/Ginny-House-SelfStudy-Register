@@ -50,6 +50,7 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
     p_class_name: parsed.data.className,
     p_is_recurring: parsed.data.isRecurring,
     p_admin_created: false,
+    p_zalo_contact: parsed.data.zaloContact || null,
   })
 
   if (error) {
@@ -110,6 +111,7 @@ export async function createRegistrationAsAdminAction(input: unknown): Promise<A
     p_class_name: parsed.data.className,
     p_is_recurring: parsed.data.isRecurring,
     p_admin_created: true,
+    p_zalo_contact: parsed.data.zaloContact || null,
   })
 
   if (error) {

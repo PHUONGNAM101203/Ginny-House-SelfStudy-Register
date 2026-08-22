@@ -29,7 +29,7 @@ export function BookingDialog({
     CreateRegistrationInput
   >({
     resolver: zodResolver(createRegistrationSchema),
-    defaultValues: { deskId, date, startTime, endTime, className: "", isRecurring: false },
+    defaultValues: { deskId, date, startTime, endTime, className: "", zaloContact: "", isRecurring: false },
   })
 
   const phone = watch("phone")
@@ -108,6 +108,11 @@ export function BookingDialog({
             <Label htmlFor="className">Tên lớp</Label>
             <Input id="className" {...register("className")} />
             {errors.className && <p className="text-sm text-destructive">{errors.className.message}</p>}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="zaloContact">Zalo liên hệ (không bắt buộc)</Label>
+            <Input id="zaloContact" placeholder="Số điện thoại hoặc tên Zalo" {...register("zaloContact")} />
+            {errors.zaloContact && <p className="text-sm text-destructive">{errors.zaloContact.message}</p>}
           </div>
           <label className="flex items-center gap-2 text-sm">
             {/* accent-* keeps the native control on the brand colour instead of

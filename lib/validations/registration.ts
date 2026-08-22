@@ -13,6 +13,7 @@ export const createRegistrationSchema = z.object({
   // Normalized (case/spacing/dash-insensitive — see lib/class-name.ts) so
   // "l1 04 26" and "L1-04-26" always end up stored as the same class.
   className: z.string().trim().min(1, "Vui lòng nhập tên lớp").max(100).transform(normalizeClassName),
+  zaloContact: z.string().trim().max(50).optional(),
   isRecurring: z.boolean().default(false),
 })
 export type CreateRegistrationInput = z.infer<typeof createRegistrationSchema>
