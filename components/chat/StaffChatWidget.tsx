@@ -85,12 +85,17 @@ export function StaffChatWidget({ profile }: { profile: Profile }) {
     return payload
   }
 
+  // Labeled from the viewer's own side — an admin sees "Quản sinh" (who
+  // they'd be talking to), not a generic "Nội bộ" that doesn't say who's on
+  // the other end; quan_sinh sees "Admin" for the same reason.
+  const counterpartRoleLabel = profile.role === "admin" ? "Quản sinh" : "Admin"
+
   const panelTitle =
     selection?.type === "staff-room"
-      ? "Nội bộ · Admin & Quản sinh"
+      ? counterpartRoleLabel
       : selection?.type === "guest"
         ? `${selection.session.student_name}${selection.session.class_name ? ` · ${selection.session.class_name}` : ""}`
-        : "Chat với học sinh"
+        : "Messenger"
 
   return (
     <div className="fixed right-4 bottom-4 z-50">
@@ -131,7 +136,7 @@ export function StaffChatWidget({ profile }: { profile: Profile }) {
                   onClick={selectStaffRoom}
                 >
                   <UsersIcon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="font-medium">Nội bộ · Admin & Quản sinh</span>
+                  <span className="font-medium">{counterpartRoleLabel}</span>
                 </button>
               </li>
               {branchNames.map((branchName) => (

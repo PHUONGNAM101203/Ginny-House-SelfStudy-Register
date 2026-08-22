@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, refresh } from "next/cache"
 import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { slotLockSchema } from "@/lib/validations/slot-lock"
@@ -29,6 +29,10 @@ export async function createSlotLockAction(input: unknown): Promise<ActionResult
 
   revalidatePath("/noi-bo/quan-ly/khoa-lich")
   revalidatePath("/")
+  // onClick-invoked (not <form action>) — revalidatePath alone won't push a
+  // refresh to this page; see actions/students.ts's createStudentAction for
+  // the full explanation of this Next.js version's behavior.
+  refresh()
   return { ok: true, data: { id: data.id } }
 }
 
@@ -40,5 +44,6 @@ export async function deactivateSlotLockAction(id: string): Promise<ActionResult
 
   revalidatePath("/noi-bo/quan-ly/khoa-lich")
   revalidatePath("/")
+  refresh()
   return { ok: true, data: null }
 }

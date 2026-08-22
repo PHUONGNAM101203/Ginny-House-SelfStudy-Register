@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, refresh } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
 import {
   createRegistrationSchema,
@@ -146,6 +146,10 @@ export async function deactivateRecurringRegistrationAction(id: string): Promise
   revalidatePath("/noi-bo/dashboard")
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
+  // onClick-invoked from RecurringRegistrationTable — revalidatePath alone
+  // won't push a refresh to the page that called it (see
+  // actions/students.ts's createStudentAction for the full explanation).
+  refresh()
   return { ok: true, data: null }
 }
 

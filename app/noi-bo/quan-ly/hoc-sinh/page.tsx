@@ -2,6 +2,11 @@ import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { StudentTable } from "@/components/admin/StudentTable"
 import { RecurringRegistrationTable, type RecurringRow } from "@/components/admin/RecurringRegistrationTable"
+import { CreateStudentDialog } from "@/components/admin/CreateStudentDialog"
+import { ImportLarkDialog } from "@/components/admin/ImportLarkDialog"
+import { CreateRecurringScheduleDialog } from "@/components/admin/CreateRecurringScheduleDialog"
+import { sortDesks } from "@/lib/desks"
+import { sortBranchesDefaultFirst } from "@/lib/branches"
 
 // Postgres `time` serializes as "HH:MM:SS" over PostgREST; the UI shows "HH:MM"
 // (same normalization as lib/schedule-data.ts's toHm).
@@ -24,7 +29,7 @@ type RecurringQueryRow = {
 export default async function StudentsPage() {
   await requireAdmin()
   const supabase = await createServerClient()
-  const [{ data: students }, { data: recurring }, { data: recentRegistrations }] = await Promise.all([
+  const [{ data: students }, { data: recurring }, { data: recentRegistrations }, { data: branches }, { data: desks }] = await Promise.all([
     supabase.from("students").select("id, full_name, phone, created_at").order("full_name"),
     supabase
       .from("recurring_registrations")
@@ -39,6 +44,9 @@ export default async function StudentsPage() {
     // avoiding deep PostgREST embeds and complex SQL in favor of plain
     // queries reduced in TS (see co-so/yeu-cau-doi-lich pages).
     supabase.from("registrations").select("student_id, class_name, date").not("class_name", "is", null).order("date", { ascending: false }),
+    // For CreateRecurringScheduleDialog's cơ sở/chỗ selects.
+    supabase.from("branches").select("id, code, name").order("name"),
+    supabase.from("desks").select("id, branch_id, label"),
   ])
 
   const recurringRows: RecurringRow[] = ((recurring ?? []) as unknown as RecurringQueryRow[]).map((r) => ({
@@ -62,13 +70,22 @@ export default async function StudentsPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="mb-4 text-xl font-semibold">Học sinh</h1>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold">Học sinh</h1>
+          <div className="flex flex-wrap gap-2">
+            <CreateStudentDialog />
+            <ImportLarkDialog />
+          </div>
+        </div>
         <StudentTable
           students={(students ?? []).map((s) => ({ ...s, class_name: latestClassByStudentId.get(s.id) ?? null }))}
         />
       </div>
       <div>
-        <h2 className="mb-1 text-lg font-semibold">Lịch cố định đang áp dụng</h2>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Lịch cố định đang áp dụng</h2>
+          <CreateRecurringScheduleDialog branches={sortBranchesDefaultFirst(branches ?? [])} desks={sortDesks(desks ?? [])} />
+        </div>
         <p className="mb-4 text-sm text-muted-foreground">
           Huỷ lịch cố định sẽ dừng tự động giữ chỗ cho các tuần sau. Buổi đã đăng ký của tuần này vẫn giữ nguyên —
           huỷ riêng từng buổi trên lịch nếu cần.
