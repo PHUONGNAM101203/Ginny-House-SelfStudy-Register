@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDaysIcon } from "lucide-react"
+import { CalendarDaysIcon, MessageCircleIcon } from "lucide-react"
 import BrandMark from "@/components/brand/BrandMark"
 import { VietnamClock } from "@/components/layout/VietnamClock"
 import { AppLauncher } from "@/components/layout/AppLauncher"
@@ -31,6 +31,7 @@ export function AppHeader({
 }) {
   const pathname = usePathname()
   const onCalendar = pathname === "/noi-bo/lich" || pathname === "/"
+  const onChat = pathname === "/noi-bo/quan-ly/chat"
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/70 sm:px-6">
@@ -59,6 +60,21 @@ export function AppHeader({
             >
               <Link href="/noi-bo/lich">
                 <CalendarDaysIcon className="size-5" />
+              </Link>
+            </Button>
+            {/* Both admin and quan_sinh get this — unlike AppLauncher below,
+                which is admin-only and would hide chat from quan_sinh
+                entirely if it lived there instead. */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Chat với học sinh"
+              aria-current={onChat ? "page" : undefined}
+              className={cn("rounded-full", onChat && "bg-accent text-foreground")}
+              asChild
+            >
+              <Link href="/noi-bo/quan-ly/chat">
+                <MessageCircleIcon className="size-5" />
               </Link>
             </Button>
             {profile.role === "admin" && <AppLauncher />}

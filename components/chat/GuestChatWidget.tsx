@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { MessageCircleIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatThread } from "@/components/chat/ChatThread"
-import { getOrCreateChatSessionAction, sendGuestChatMessageAction } from "@/actions/chat"
+import { getOrCreateChatSessionAction, getGuestChatHistoryAction, sendGuestChatMessageAction } from "@/actions/chat"
 import { broadcastChatMessage, type ChatMessagePayload } from "@/lib/chat-realtime"
 import { isChatWindowOpen } from "@/lib/chat-window"
 
@@ -24,6 +24,11 @@ export function GuestChatWidget({ registration }: { registration: GuestRegistrat
     isChatWindowOpen(registration.date, registration.startTime, registration.endTime, new Date())
   )
   const [sessionId, setSessionId] = useState<string | null>(null)
+  // Fetched once, together, before ChatThread ever mounts — ChatThread only
+  // reads initialMessages at mount (see its own comment), so mounting it
+  // before this history resolves would silently drop it, same class of bug
+  // as the earlier "sent message doesn't appear" fix.
+  const [history, setHistory] = useState<ChatMessagePayload[] | null>(null)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -34,9 +39,12 @@ export function GuestChatWidget({ registration }: { registration: GuestRegistrat
 
   useEffect(() => {
     if (!open || sessionId) return
-    getOrCreateChatSessionAction(registration.id).then((result) => {
-      if (result.ok) setSessionId(result.data.sessionId)
-    })
+    Promise.all([getOrCreateChatSessionAction(registration.id), getGuestChatHistoryAction(registration.id)]).then(
+      ([sessionResult, historyResult]) => {
+        if (sessionResult.ok) setSessionId(sessionResult.data.sessionId)
+        setHistory(historyResult.ok ? historyResult.data : [])
+      }
+    )
   }, [open, sessionId, registration.id])
 
   if (!windowOpen) return null
@@ -63,8 +71,8 @@ export function GuestChatWidget({ registration }: { registration: GuestRegistrat
               <XIcon className="size-4" />
             </Button>
           </div>
-          {sessionId ? (
-            <ChatThread sessionId={sessionId} currentRole="guest" initialMessages={[]} onSend={handleSend} disabled={false} />
+          {sessionId && history ? (
+            <ChatThread sessionId={sessionId} currentRole="guest" initialMessages={history} onSend={handleSend} disabled={false} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Đang kết nối...</div>
           )}
