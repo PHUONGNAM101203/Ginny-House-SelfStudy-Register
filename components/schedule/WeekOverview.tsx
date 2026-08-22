@@ -6,7 +6,7 @@ import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
 
 type Desk = { id: string; label: string }
-type Registration = { deskId: string; date: string; startTime: string; endTime: string }
+type Registration = { deskId: string; date: string; startTime: string; endTime: string; studentName: string; className: string | null }
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
 // Same weekday abbreviations as DateNavigator's own strip, so the two read
@@ -17,9 +17,18 @@ const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
 // RANGES) — splitting TIME_SLOTS on that gap reproduces the same two blocks
 // ScheduleGrid renders for a single day, without a second copy of the
 // business hours living here.
+//
+// `end` is the block's real closing boundary (12:00 / 22:00). TIME_SLOTS
+// only carries slot *start* times, so a plain filter's last row is
+// 11:30/21:30 — same class of gap ScheduleGrid's boundaryRowMax() fixes for
+// the single-day RBC grid: a grid that stops at 11:30 visually reads as not
+// reaching the 12:00 the block label promises. Here (a plain HTML table, not
+// RBC) the fix is a trailing boundary row appended below the slot rows, not
+// a `max` prop — same intent: a real, native, non-clickable closing tick row
+// rather than a label invented outside the grid.
 const BLOCKS = [
-  { label: "Buổi sáng", slots: TIME_SLOTS.filter((s) => s.start < "12:00") },
-  { label: "Buổi chiều – tối", slots: TIME_SLOTS.filter((s) => s.start >= "14:00") },
+  { label: "Buổi sáng", end: "12:00", slots: TIME_SLOTS.filter((s) => s.start < "12:00") },
+  { label: "Buổi chiều – tối", end: "22:00", slots: TIME_SLOTS.filter((s) => s.start >= "14:00") },
 ] as const
 
 function isoDayOfWeek(dateStr: string): number {
@@ -27,28 +36,38 @@ function isoDayOfWeek(dateStr: string): number {
   return ((date.getUTCDay() + 6) % 7) + 1
 }
 
-function cellStat(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slot: TimeSlot) {
+// Returns every registration whose desk is open (not locked) for this
+// date/slot, alongside how many desks are open at all — matches ScheduleGrid's
+// own overlap check (start < slot.end && end > slot.start) so a cell here
+// agrees with what the day view would show for the same slot.
+function cellRegistrations(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slot: TimeSlot) {
   const isoDow = isoDayOfWeek(date)
-  const availableDesks = desks.filter(
-    (d) =>
-      !locks.some(
-        (l) => (l.deskId === d.id || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < slot.end && l.endTime > slot.start
+  const availableDeskIds = new Set(
+    desks
+      .filter(
+        (d) =>
+          !locks.some(
+            (l) => (l.deskId === d.id || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < slot.end && l.endTime > slot.start
+          )
       )
+      .map((d) => d.id)
   )
-  const bookedDesks = availableDesks.filter((d) =>
-    registrations.some((r) => r.deskId === d.id && r.date === date && r.startTime < slot.end && r.endTime > slot.start)
-  ).length
-  return { totalDesks: availableDesks.length, bookedDesks }
+  const matches = registrations.filter(
+    (r) => availableDeskIds.has(r.deskId) && r.date === date && r.startTime < slot.end && r.endTime > slot.start
+  )
+  return { totalDesks: availableDeskIds.size, matches }
 }
 
 /**
  * Week-at-a-glance as an actual calendar grid — time down the left the same
  * way the single-day view reads, seven day columns across the top instead
- * of one, split into the same morning / afternoon–evening blocks. Desk
- * detail collapses into one booked-vs-open count per cell (a real 10-desks-
- * by-7-days grid would need 70 columns, which stops being an "at a glance"
- * view on any screen); each cell still links into the single-day view for
- * that date, so drilling into who's actually booked is one click away.
+ * of one, split into the same morning / afternoon–evening blocks. Each cell
+ * shows the booked student's name (same "Tên · Lớp" format as the day
+ * view's event chips) so it reads as who's booked, not just a density
+ * heatmap — a cell with more than one booking (multiple desks, same slot)
+ * shows the first name plus a "+N" count. Each cell still links into the
+ * single-day view for that date, so seeing every desk in a busy slot is one
+ * click away.
  */
 export function WeekOverview({
   desks,
@@ -112,27 +131,50 @@ export function WeekOverview({
                     {slot.start}
                   </td>
                   {weekDates.map((dateStr) => {
-                    const { totalDesks, bookedDesks } = cellStat(desks, registrations, locks, dateStr, slot)
-                    const rate = totalDesks === 0 ? 0 : bookedDesks / totalDesks
-                    const label = totalDesks === 0 ? "Không có chỗ" : `${bookedDesks}/${totalDesks} đã đặt`
+                    const { totalDesks, matches } = cellRegistrations(desks, registrations, locks, dateStr, slot)
+                    const first = matches[0]
+                    const label =
+                      totalDesks === 0
+                        ? "Không có chỗ"
+                        : matches.length === 0
+                          ? "Còn trống"
+                          : matches.map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName)).join(", ")
                     return (
                       <td key={dateStr} className="border-b border-l border-border p-0">
                         <Link
                           href={`?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`}
-                          className="flex h-7 w-full items-center justify-center transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50"
-                          // Booking density as fill opacity, the same visual
-                          // language a real calendar's "busy" shading uses —
-                          // an empty cell (rate 0) is left transparent so it
-                          // reads exactly like an open slot in the day grid.
-                          style={rate > 0 ? { backgroundColor: `color-mix(in oklch, var(--primary) ${Math.round(rate * 85 + 15)}%, transparent)` } : undefined}
+                          // Same fixed light-tint chip look as the day view's
+                          // .rbc-event (app/globals.css) rather than a
+                          // density-scaled opacity — a saturated fill at high
+                          // occupancy would make the name unreadable.
+                          className={cn(
+                            "flex h-7 w-full items-center justify-center gap-1 overflow-hidden px-1 text-[11px] leading-none font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
+                            totalDesks === 0 && "bg-muted"
+                          )}
+                          style={
+                            first
+                              ? { backgroundColor: "color-mix(in oklch, var(--primary) 12%, var(--card))", color: "var(--primary)" }
+                              : undefined
+                          }
                           aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
                           title={label}
-                        />
+                        >
+                          {first && (
+                            <span className="truncate">{first.className ? `${first.studentName} · ${first.className}` : first.studentName}</span>
+                          )}
+                          {matches.length > 1 && <span className="shrink-0 text-muted-foreground">+{matches.length - 1}</span>}
+                        </Link>
                       </td>
                     )
                   })}
                 </tr>
               ))}
+              <tr>
+                <td className="sticky left-0 border-t border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">{block.end}</td>
+                {weekDates.map((dateStr) => (
+                  <td key={dateStr} className="h-7 border-t border-l border-border bg-muted/40" />
+                ))}
+              </tr>
             </tbody>
           </table>
         </div>

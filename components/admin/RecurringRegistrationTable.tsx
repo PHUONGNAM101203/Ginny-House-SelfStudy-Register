@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export type RecurringRow = {
   id: string
   student_name: string
+  class_name: string | null
   branch_name: string
   desk_label: string
   day_of_week: number
@@ -31,7 +32,7 @@ export function RecurringRegistrationTable({ rows }: { rows: RecurringRow[] }) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Học sinh</TableHead><TableHead>Cơ sở</TableHead><TableHead>Chỗ</TableHead>
+          <TableHead>Học sinh</TableHead><TableHead>Lớp</TableHead><TableHead>Cơ sở</TableHead><TableHead>Chỗ</TableHead>
           <TableHead>Thứ</TableHead><TableHead>Giờ</TableHead><TableHead />
         </TableRow>
       </TableHeader>
@@ -39,6 +40,7 @@ export function RecurringRegistrationTable({ rows }: { rows: RecurringRow[] }) {
         {rows.map((r) => (
           <TableRow key={r.id}>
             <TableCell>{r.student_name}</TableCell>
+            <TableCell>{r.class_name ?? "—"}</TableCell>
             <TableCell>{r.branch_name}</TableCell>
             <TableCell>{r.desk_label}</TableCell>
             <TableCell>{DAY_LABELS[r.day_of_week]}</TableCell>

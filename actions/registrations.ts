@@ -13,6 +13,26 @@ import type { ActionResult } from "@/types"
 import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 
+export type StudentLookupResult = { fullName: string; phone: string; className: string | null }
+
+/**
+ * Autocomplete for a returning guest: once they've typed enough of their own
+ * phone number, offer to prefill name/class from their most recent
+ * registration (see find_student_by_phone_prefix, migration 0008). Phone-
+ * keyed rather than name-keyed on purpose — see that RPC's comment.
+ */
+export async function findStudentByPhonePrefixAction(phonePrefix: string): Promise<ActionResult<StudentLookupResult | null>> {
+  if (phonePrefix.length < 4) return { ok: true, data: null }
+
+  const supabase = createPublicClient()
+  const { data, error } = await supabase.rpc("find_student_by_phone_prefix", { p_phone_prefix: phonePrefix })
+  if (error) return { ok: false, error: error.message }
+
+  const row = data?.[0]
+  if (!row) return { ok: true, data: null }
+  return { ok: true, data: { fullName: row.full_name, phone: row.phone, className: row.class_name } }
+}
+
 export async function createRegistrationAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = createRegistrationSchema.safeParse(input)
   if (!parsed.success) {

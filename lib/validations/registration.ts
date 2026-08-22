@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { normalizeClassName } from "@/lib/class-name"
 
 export const phoneRegex = /^0\d{9}$/
 
@@ -9,7 +10,9 @@ export const createRegistrationSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   fullName: z.string().trim().min(2, "Tên quá ngắn").max(100),
   phone: z.string().regex(phoneRegex, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),
-  className: z.string().trim().min(1, "Vui lòng nhập tên lớp").max(100),
+  // Normalized (case/spacing/dash-insensitive — see lib/class-name.ts) so
+  // "l1 04 26" and "L1-04-26" always end up stored as the same class.
+  className: z.string().trim().min(1, "Vui lòng nhập tên lớp").max(100).transform(normalizeClassName),
   isRecurring: z.boolean().default(false),
 })
 export type CreateRegistrationInput = z.infer<typeof createRegistrationSchema>
