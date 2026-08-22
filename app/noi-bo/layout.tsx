@@ -39,7 +39,7 @@ export default async function InternalLayout({ children }: { children: React.Rea
           max-width was a no-op, since content was already shrink-wrapped
           well below the old max-w-6xl too. */}
       <main className="mx-auto w-full max-w-[1600px] p-4">{children}</main>
-      <StaffChatWidget />
+      <StaffChatWidget profile={profile} />
     </>
   )
 }

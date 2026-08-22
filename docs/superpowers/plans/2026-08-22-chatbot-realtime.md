@@ -1,5 +1,7 @@
 # Kế hoạch triển khai: Chatbot thời gian thực Guest ↔ Admin/Quản sinh
 
+> **✅ HOÀN THÀNH 2026-08-22.** Cả 9 task đã triển khai, kiểm thử end-to-end và lên production (ginnyhouse.space). Khác với thiết kế ban đầu: giao diện phía staff (Task 8) là **floating popup góc dưới-phải** (giống hệt guest), không phải icon trên header + trang riêng — trang `/noi-bo/quan-ly/chat` vẫn còn nhưng chỉ là điểm đến phụ cho link trong notification. Có thêm một cải tiến ngoài kế hoạch: kênh broadcast cố định `chat:staff-inbox` để staff thấy guest xuất hiện ngay lập tức thay vì chờ poll 30 giây.
+
 > **Dành cho agent thực thi:** BẮT BUỘC dùng skill superpowers:subagent-driven-development (khuyến nghị) hoặc superpowers:executing-plans để triển khai kế hoạch này theo từng task. Các bước dùng cú pháp checkbox (`- [ ]`) để theo dõi tiến độ.
 
 **Mục tiêu:** Cho phép guest (học sinh, không đăng nhập) chat trực tiếp, thời gian thực, với admin/quản sinh trong đúng khoảng thời gian ca đăng ký tự học của họ; mỗi guest chỉ thấy được cuộc chat của chính mình, không thấy/chat được với guest khác; phiên chat tự động hết hiệu lực khi ca học kết thúc.

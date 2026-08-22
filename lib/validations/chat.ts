@@ -11,3 +11,9 @@ export const sendStaffChatMessageSchema = z.object({
   body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000, "Tin nhắn quá dài"),
 })
 export type SendStaffChatMessageInput = z.infer<typeof sendStaffChatMessageSchema>
+
+/** Internal admin <-> quan_sinh room — no sessionId, it's one shared room. */
+export const sendStaffRoomMessageSchema = z.object({
+  body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000, "Tin nhắn quá dài"),
+})
+export type SendStaffRoomMessageInput = z.infer<typeof sendStaffRoomMessageSchema>

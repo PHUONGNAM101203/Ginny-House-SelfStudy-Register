@@ -36,6 +36,11 @@ function isoDayOfWeek(dateStr: string): number {
   return ((date.getUTCDay() + 6) % 7) + 1
 }
 
+function minutesOf(hm: string): number {
+  const [h, m] = hm.split(":").map(Number)
+  return h * 60 + m
+}
+
 // Returns every registration whose desk is open (not locked) for this
 // date/slot, alongside how many desks are open at all — matches ScheduleGrid's
 // own overlap check (start < slot.end && end > slot.start) so a cell here
@@ -64,11 +69,20 @@ type CellPlanEntry =
 
 // A registration spanning several consecutive 30-minute slots used to repeat
 // its name on every row it covered (four rows all reading "Gin Anh" for a
-// 2-hour booking). This merges consecutive slots where the same registration
-// is the primary (first) match into one rowSpan cell — a single card
-// centered over the whole span — instead. The run breaks the moment the
-// primary match's identity changes (a different booking starts, or this one
-// ends), so overlapping multi-desk slots still resolve correctly.
+// 2-hour booking). This merges the slots it covers into one rowSpan cell —
+// a single card centered over the whole span — instead.
+//
+// The span is computed directly from the primary registration's own
+// `endTime` (ground truth), not by re-checking "is matches[0] still the same
+// id" slot by slot — that re-derivation was the actual bug: when a SECOND
+// registration on a different desk starts partway through the first one's
+// range, array ordering can make it sort before the first registration at
+// that later slot, so matches[0]'s identity "changes" even though the
+// original booking is still running — which silently cut the merged card
+// short and left the rest of that booking's own slots rendering as blank.
+// Reading the end time straight off the registration sidesteps that
+// entirely: the card always covers exactly what the booking says it does,
+// regardless of what else is happening in other desks at the same time.
 function computeColumnPlan(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slots: readonly TimeSlot[]): CellPlanEntry[] {
   const plan: CellPlanEntry[] = []
   let i = 0
@@ -80,8 +94,9 @@ function computeColumnPlan(desks: Desk[], registrations: Registration[], locks: 
       i++
       continue
     }
+    const endMinutes = minutesOf(primary.endTime)
     let span = 1
-    while (i + span < slots.length && cellRegistrations(desks, registrations, locks, date, slots[i + span]).matches[0]?.id === primary.id) {
+    while (i + span < slots.length && minutesOf(slots[i + span].start) < endMinutes) {
       span++
     }
     plan.push({ skip: false, rowSpan: span, totalDesks, matches })

@@ -9,12 +9,24 @@ import { createBrowserClient } from "@/lib/supabase/client"
 export type ChatMessagePayload = {
   id: string
   senderRole: "guest" | "staff"
+  /**
+   * Profile id of the sender — only present for staff messages. Needed for
+   * the internal staff room (admin ↔ quan_sinh): both sides are literally
+   * senderRole "staff", so "is this my own message" can't be decided by
+   * role alone there — see ChatThread's ownership check.
+   */
+  senderId?: string
+  /** Display name for a staff sender — shown as a small label in the staff room, where knowing *which* staff member said something matters. */
+  senderName?: string
   body: string
   createdAt: string
 }
 
 const CHANNEL_EVENT = "new_message"
 
+// "staff-room" (not a UUID) is a valid, fixed channel id for the shared
+// internal chat — same helper as per-registration session channels, just a
+// different kind of "room" identifier.
 function channelName(sessionId: string): string {
   return `chat:${sessionId}`
 }

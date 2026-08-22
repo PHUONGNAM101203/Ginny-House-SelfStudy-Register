@@ -10,6 +10,7 @@ import { subscribeToChatChannel, type ChatMessagePayload } from "@/lib/chat-real
 export function ChatThread({
   sessionId,
   currentRole,
+  currentSenderId,
   initialMessages,
   onSend,
   disabled,
@@ -17,6 +18,13 @@ export function ChatThread({
 }: {
   sessionId: string
   currentRole: "guest" | "staff"
+  /**
+   * Profile id of the viewer, for rooms where senderRole alone can't tell
+   * "own message" apart — the internal staff room has admin and quan_sinh
+   * both as senderRole "staff". Omit for guest↔staff chat, where role
+   * comparison is already unambiguous (there's only ever one of each side).
+   */
+  currentSenderId?: string
   initialMessages: ChatMessagePayload[]
   /**
    * Returns the sent message (or null on failure) so this component can
@@ -62,17 +70,15 @@ export function ChatThread({
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={cn(
-              "max-w-[80%] rounded-lg px-3 py-2 text-sm",
-              m.senderRole === currentRole ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"
-            )}
-          >
-            {m.body}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const isOwn = currentSenderId ? m.senderId === currentSenderId : m.senderRole === currentRole
+          return (
+            <div key={m.id} className={cn("flex max-w-[80%] flex-col gap-0.5", isOwn && "ml-auto items-end")}>
+              {!isOwn && m.senderName && <span className="px-1 text-[10px] text-muted-foreground">{m.senderName}</span>}
+              <div className={cn("rounded-lg px-3 py-2 text-sm", isOwn ? "bg-primary text-primary-foreground" : "bg-muted")}>{m.body}</div>
+            </div>
+          )
+        })}
         <div ref={bottomRef} />
       </div>
       <div className="flex items-center gap-2 border-t p-2">

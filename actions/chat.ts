@@ -3,7 +3,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireProfile } from "@/lib/auth"
-import { sendGuestChatMessageSchema, sendStaffChatMessageSchema } from "@/lib/validations/chat"
+import { sendGuestChatMessageSchema, sendStaffChatMessageSchema, sendStaffRoomMessageSchema } from "@/lib/validations/chat"
 import type { ChatMessagePayload } from "@/lib/chat-realtime"
 import type { ActionResult } from "@/types"
 
@@ -26,6 +26,7 @@ export type ActiveChatSessionRow = {
   id: string
   student_name: string
   class_name: string | null
+  branch_name: string
   date: string
   start_time: string
   end_time: string
@@ -48,18 +49,73 @@ export async function getActiveChatSessionsAction(): Promise<ActionResult<Active
   const registrationIds = (sessions ?? []).map((s) => s.registration_id)
   const { data: registrations } =
     registrationIds.length > 0
-      ? await supabase.from("registrations").select("id, student_name, class_name, date, start_time, end_time").in("id", registrationIds)
+      ? await supabase.from("registrations").select("id, branch_id, student_name, class_name, date, start_time, end_time").in("id", registrationIds)
       : { data: [] }
+
+  const branchIds = [...new Set((registrations ?? []).map((r) => r.branch_id))]
+  const { data: branches } = branchIds.length > 0 ? await supabase.from("branches").select("id, name").in("id", branchIds) : { data: [] }
+  const branchNameById = new Map((branches ?? []).map((b) => [b.id, b.name]))
 
   const rows = (sessions ?? [])
     .map((s) => {
       const reg = (registrations ?? []).find((r) => r.id === s.registration_id)
       if (!reg) return null
-      return { sessionId: s.id, ...reg, start_time: toHm(reg.start_time), end_time: toHm(reg.end_time) }
+      return {
+        sessionId: s.id,
+        id: reg.id,
+        student_name: reg.student_name,
+        class_name: reg.class_name,
+        branch_name: branchNameById.get(reg.branch_id) ?? "",
+        date: reg.date,
+        start_time: toHm(reg.start_time),
+        end_time: toHm(reg.end_time),
+      }
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
 
   return { ok: true, data: rows }
+}
+
+/** Prior messages in the shared internal admin <-> quan_sinh room. */
+export async function getStaffRoomHistoryAction(): Promise<ActionResult<ChatMessagePayload[]>> {
+  await requireProfile()
+  const supabase = await createServerClient()
+  const { data: messages, error } = await supabase
+    .from("staff_chat_messages")
+    .select("id, sender_profile_id, sender_name, body, created_at")
+    .order("created_at", { ascending: true })
+  if (error) return { ok: false, error: error.message }
+
+  return {
+    ok: true,
+    data: (messages ?? []).map((m) => ({
+      id: m.id,
+      senderRole: "staff" as const,
+      senderId: m.sender_profile_id,
+      senderName: m.sender_name,
+      body: m.body,
+      createdAt: m.created_at,
+    })),
+  }
+}
+
+export async function sendStaffRoomMessageAction(input: unknown): Promise<ActionResult<ChatMessagePayload>> {
+  const profile = await requireProfile()
+  const parsed = sendStaffRoomMessageSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from("staff_chat_messages")
+    .insert({ sender_profile_id: profile.id, sender_name: profile.fullName, body: parsed.data.body })
+    .select("id, created_at")
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  return {
+    ok: true,
+    data: { id: data.id, senderRole: "staff", senderId: profile.id, senderName: profile.fullName, body: parsed.data.body, createdAt: data.created_at },
+  }
 }
 
 export async function getOrCreateChatSessionAction(registrationId: string): Promise<ActionResult<{ sessionId: string }>> {
