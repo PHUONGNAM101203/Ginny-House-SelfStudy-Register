@@ -7,6 +7,7 @@ import BrandMark from "@/components/brand/BrandMark"
 import { VietnamClock } from "@/components/layout/VietnamClock"
 import { AppLauncher } from "@/components/layout/AppLauncher"
 import { NotificationBell } from "@/components/layout/NotificationBell"
+import { PushNotificationToggle } from "@/components/layout/PushNotificationToggle"
 import { ThemeToggle } from "@/components/layout/ThemeToggle"
 import { UserMenu } from "@/components/layout/UserMenu"
 import { Button } from "@/components/ui/button"
@@ -66,6 +67,8 @@ export function AppHeader({
         )}
 
         <ThemeToggle />
+
+        {profile && <PushNotificationToggle />}
 
         {profile && notifications && (
           <NotificationBell initialUnreadCount={notifications.unreadCount} items={notifications.items} />

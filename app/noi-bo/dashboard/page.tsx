@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { computeOccupancy, findMissingRegistrations, computeFrequencyRanking } from "@/lib/dashboard"
+import { sendPushToRole } from "@/lib/push/send"
 import { OccupancyChart } from "@/components/dashboard/OccupancyChart"
 import { MissingRegistrationsList } from "@/components/dashboard/MissingRegistrationsList"
 import { TrendChart } from "@/components/dashboard/TrendChart"
@@ -102,17 +103,32 @@ export default async function DashboardPage() {
     // Best-effort: a failed sync (e.g. a transient network blip) shouldn't
     // break the dashboard render — the notification is a convenience mirror
     // of data this panel already displays directly.
-    await supabase.from("notifications").upsert(
-      missing.map((m) => ({
-        type: "missing_registration_weekly" as const,
+    const { data: newlyMissing } = await supabase
+      .from("notifications")
+      .upsert(
+        missing.map((m) => ({
+          type: "missing_registration_weekly" as const,
+          title: "Học sinh chưa đăng ký tuần này",
+          body: m.className ? `${m.studentName} · ${m.className}` : m.studentName,
+          link: "/noi-bo/dashboard",
+          target_role: null,
+          dedupe_key: `missing:${m.studentId}:${mondayStr}`,
+        })),
+        { onConflict: "dedupe_key", ignoreDuplicates: true }
+      )
+      .select("id")
+
+    // ignoreDuplicates -> ON CONFLICT DO NOTHING, so a row that already
+    // existed (already pushed on an earlier dashboard visit this week) never
+    // comes back through .select() here — this only fires for genuinely new
+    // misses, one summary push per run rather than one per student.
+    if (newlyMissing && newlyMissing.length > 0) {
+      void sendPushToRole(null, {
         title: "Học sinh chưa đăng ký tuần này",
-        body: m.className ? `${m.studentName} · ${m.className}` : m.studentName,
+        body: `${newlyMissing.length} học sinh chưa đăng ký tuần này`,
         link: "/noi-bo/dashboard",
-        target_role: null,
-        dedupe_key: `missing:${m.studentId}:${mondayStr}`,
-      })),
-      { onConflict: "dedupe_key", ignoreDuplicates: true }
-    )
+      })
+    }
   }
 
   const ranking = computeFrequencyRanking(

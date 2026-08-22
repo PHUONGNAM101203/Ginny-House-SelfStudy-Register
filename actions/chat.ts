@@ -4,6 +4,7 @@ import { createPublicClient } from "@/lib/supabase/public"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireProfile } from "@/lib/auth"
 import { sendGuestChatMessageSchema, sendStaffChatMessageSchema, sendStaffRoomMessageSchema } from "@/lib/validations/chat"
+import { sendPushToRole } from "@/lib/push/send"
 import type { ChatMessagePayload } from "@/lib/chat-realtime"
 import type { ActionResult } from "@/types"
 
@@ -158,6 +159,12 @@ export async function sendGuestChatMessageAction(
     p_body: parsed.data.body,
   })
   if (error) return { ok: false, error: error.message }
+
+  // Same event send_guest_chat_message (migration 0007) already writes to
+  // notifications for the bell — target_role null there means every staff
+  // role, matched here.
+  void sendPushToRole(null, { title: "Tin nhắn chat mới", body: data.body, link: "/noi-bo/quan-ly/chat" })
+
   return { ok: true, data: { id: data.id, body: data.body, createdAt: data.created_at } }
 }
 

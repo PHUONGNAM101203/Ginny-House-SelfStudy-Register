@@ -2,6 +2,7 @@
 
 import { revalidatePath, refresh } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
+import { sendPushToRole } from "@/lib/push/send"
 import {
   createRegistrationSchema,
   cancelRegistrationSchema,
@@ -211,6 +212,15 @@ export async function requestRegistrationChangeAction(input: unknown): Promise<A
     }
     return { ok: false, error: "Có lỗi xảy ra, vui lòng thử lại" }
   }
+
+  // Fire-and-forget, matches the notifications row request_registration_change
+  // (migration 0006) already inserts for the in-app bell — push is a second,
+  // independent delivery channel for the same event, not authoritative.
+  void sendPushToRole("admin", {
+    title: parsed.data.kind === "cancel" ? "Yêu cầu huỷ lịch mới" : "Yêu cầu đổi lịch mới",
+    body: parsed.data.requestedByName,
+    link: "/noi-bo/quan-ly/yeu-cau-doi-lich",
+  })
 
   return { ok: true, data: { id: data.id } }
 }
