@@ -1,6 +1,7 @@
 import { getSessionProfile } from "@/lib/auth"
 import { getNotificationSummary } from "@/lib/notifications/summary"
 import { AppHeader } from "@/components/layout/AppHeader"
+import { StaffChatWidget } from "@/components/chat/StaffChatWidget"
 
 // This layout wraps every route under /noi-bo/*, including /noi-bo/dang-nhap
 // itself (Next.js layouts wrap all filesystem descendants — there is no way
@@ -38,6 +39,7 @@ export default async function InternalLayout({ children }: { children: React.Rea
           max-width was a no-op, since content was already shrink-wrapped
           well below the old max-w-6xl too. */}
       <main className="mx-auto w-full max-w-[1600px] p-4">{children}</main>
+      <StaffChatWidget />
     </>
   )
 }

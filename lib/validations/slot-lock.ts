@@ -1,12 +1,12 @@
 import { z } from "zod"
 
 export const slotLockSchema = z.object({
-  branchId: z.string().uuid(),
-  deskId: z.string().uuid().nullable(),
-  dayOfWeek: z.number().int().min(1).max(7),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/),
-  reason: z.string().trim().max(200).optional(),
+  branchId: z.string().uuid("Cơ sở không hợp lệ"),
+  deskId: z.string().uuid("Chỗ không hợp lệ").nullable(),
+  dayOfWeek: z.number().int().min(1, "Thứ không hợp lệ").max(7, "Thứ không hợp lệ"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Giờ bắt đầu không hợp lệ"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Giờ kết thúc không hợp lệ"),
+  reason: z.string().trim().max(200, "Lý do quá dài").optional(),
 })
 export type SlotLockInput = z.infer<typeof slotLockSchema>
 

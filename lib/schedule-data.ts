@@ -9,6 +9,7 @@ export type Desk = { id: string; label: string }
 export type RegistrationRow = {
   id: string
   deskId: string
+  studentId: string
   date: string
   startTime: string
   endTime: string
@@ -30,7 +31,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true),
     supabase
       .from("registrations")
-      .select("id, desk_id, date, start_time, end_time, student_name, class_name")
+      .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name")
       .eq("branch_id", branchId)
       .eq("status", "active")
       .gte("date", from)
@@ -48,6 +49,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     registrations: (registrations ?? []).map((r) => ({
       id: r.id,
       deskId: r.desk_id,
+      studentId: r.student_id,
       date: r.date,
       startTime: toHm(r.start_time),
       endTime: toHm(r.end_time),

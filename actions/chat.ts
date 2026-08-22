@@ -13,6 +13,55 @@ function toPayload(row: ChatMessageRow): ChatMessagePayload {
   return { id: row.id, senderRole: row.sender_role, body: row.body, createdAt: row.created_at }
 }
 
+// Postgres `time` columns serialize as "HH:MM:SS" over PostgREST, but
+// isChatWindowOpen expects "HH:MM" — same normalization every other page
+// reading a raw time column already needs (see dashboard/page.tsx's toHm).
+function toHm(value: string): string {
+  const [h, m] = value.split(":")
+  return `${h}:${m}`
+}
+
+export type ActiveChatSessionRow = {
+  sessionId: string
+  id: string
+  student_name: string
+  class_name: string | null
+  date: string
+  start_time: string
+  end_time: string
+}
+
+/**
+ * Every currently-active chat_sessions row joined with its registration —
+ * shared by the floating StaffChatWidget (polled) and the full-page
+ * /noi-bo/quan-ly/chat inbox, so the query lives in one place.
+ */
+export async function getActiveChatSessionsAction(): Promise<ActionResult<ActiveChatSessionRow[]>> {
+  await requireProfile()
+  const supabase = await createServerClient()
+
+  // Join thủ công trong TS thay vì PostgREST embed sâu — đúng quy ước đã
+  // thiết lập ở trang co-so/yeu-cau-doi-lich (tránh embed-shape ambiguity).
+  const { data: sessions, error } = await supabase.from("chat_sessions").select("id, registration_id, status").eq("status", "active")
+  if (error) return { ok: false, error: error.message }
+
+  const registrationIds = (sessions ?? []).map((s) => s.registration_id)
+  const { data: registrations } =
+    registrationIds.length > 0
+      ? await supabase.from("registrations").select("id, student_name, class_name, date, start_time, end_time").in("id", registrationIds)
+      : { data: [] }
+
+  const rows = (sessions ?? [])
+    .map((s) => {
+      const reg = (registrations ?? []).find((r) => r.id === s.registration_id)
+      if (!reg) return null
+      return { sessionId: s.id, ...reg, start_time: toHm(reg.start_time), end_time: toHm(reg.end_time) }
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+
+  return { ok: true, data: rows }
+}
+
 export async function getOrCreateChatSessionAction(registrationId: string): Promise<ActionResult<{ sessionId: string }>> {
   const supabase = createPublicClient()
   const { data, error } = await supabase.rpc("get_or_create_chat_session", { p_registration_id: registrationId })

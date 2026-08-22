@@ -6,7 +6,7 @@ import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
 
 type Desk = { id: string; label: string }
-type Registration = { deskId: string; date: string; startTime: string; endTime: string; studentName: string; className: string | null }
+type Registration = { id: string; studentId: string; deskId: string; date: string; startTime: string; endTime: string; studentName: string; className: string | null }
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
 // Same weekday abbreviations as DateNavigator's own strip, so the two read
@@ -58,16 +58,48 @@ function cellRegistrations(desks: Desk[], registrations: Registration[], locks: 
   return { totalDesks: availableDeskIds.size, matches }
 }
 
+type CellPlanEntry =
+  | { skip: true }
+  | { skip: false; rowSpan: number; totalDesks: number; matches: Registration[] }
+
+// A registration spanning several consecutive 30-minute slots used to repeat
+// its name on every row it covered (four rows all reading "Gin Anh" for a
+// 2-hour booking). This merges consecutive slots where the same registration
+// is the primary (first) match into one rowSpan cell — a single card
+// centered over the whole span — instead. The run breaks the moment the
+// primary match's identity changes (a different booking starts, or this one
+// ends), so overlapping multi-desk slots still resolve correctly.
+function computeColumnPlan(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slots: readonly TimeSlot[]): CellPlanEntry[] {
+  const plan: CellPlanEntry[] = []
+  let i = 0
+  while (i < slots.length) {
+    const { totalDesks, matches } = cellRegistrations(desks, registrations, locks, date, slots[i])
+    const primary = matches[0]
+    if (!primary) {
+      plan.push({ skip: false, rowSpan: 1, totalDesks, matches })
+      i++
+      continue
+    }
+    let span = 1
+    while (i + span < slots.length && cellRegistrations(desks, registrations, locks, date, slots[i + span]).matches[0]?.id === primary.id) {
+      span++
+    }
+    plan.push({ skip: false, rowSpan: span, totalDesks, matches })
+    for (let k = 1; k < span; k++) plan.push({ skip: true })
+    i += span
+  }
+  return plan
+}
+
 /**
  * Week-at-a-glance as an actual calendar grid — time down the left the same
  * way the single-day view reads, seven day columns across the top instead
- * of one, split into the same morning / afternoon–evening blocks. Each cell
- * shows the booked student's name (same "Tên · Lớp" format as the day
- * view's event chips) so it reads as who's booked, not just a density
- * heatmap — a cell with more than one booking (multiple desks, same slot)
- * shows the first name plus a "+N" count. Each cell still links into the
- * single-day view for that date, so seeing every desk in a busy slot is one
- * click away.
+ * of one, split into the same morning / afternoon–evening blocks. A booking
+ * spanning multiple slots renders as one merged card (rowSpan) centered over
+ * its whole time range — name, class, and (staff view only) phone — instead
+ * of repeating the name on every row it covers. Each cell still links into
+ * the single-day view for that date, so seeing every desk in a busy slot is
+ * one click away.
  */
 export function WeekOverview({
   desks,
@@ -75,6 +107,7 @@ export function WeekOverview({
   locks,
   weekDates,
   branchId,
+  phoneByStudentId,
 }: {
   desks: Desk[]
   registrations: Registration[]
@@ -82,6 +115,13 @@ export function WeekOverview({
   /** Seven "yyyy-MM-dd" strings, Monday through Sunday (see lib/vn-date.ts). */
   weekDates: string[]
   branchId?: string
+  /**
+   * Staff-only. Omitted entirely on the guest-facing page (which fetches
+   * registrations with the anon client — students.phone RLS only allows
+   * is_staff() reads, and even if it didn't, the public calendar must never
+   * show one guest's phone number to another).
+   */
+  phoneByStudentId?: Map<string, string>
 }) {
   if (desks.length === 0) {
     return (
@@ -95,90 +135,100 @@ export function WeekOverview({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {BLOCKS.map((block) => (
-        <div key={block.label} className="min-w-0 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[560px] border-collapse text-sm">
-            <caption className="sr-only">{block.label}</caption>
-            <thead>
-              <tr>
-                <th className="sticky left-0 w-14 border-b border-border bg-card p-2 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  {block.label}
-                </th>
-                {weekDates.map((dateStr) => {
-                  const date = parseYmd(dateStr)
-                  const isToday = dateStr === todayStr
-                  return (
-                    <th
-                      key={dateStr}
-                      className={cn(
-                        "border-b border-l border-border p-2 text-center text-xs font-semibold uppercase",
-                        isToday ? "text-primary" : "text-muted-foreground"
-                      )}
-                    >
-                      <div>{WEEKDAY_LABELS[(date.getDay() + 6) % 7]}</div>
-                      <div className={cn("text-sm font-medium normal-case tabular-nums", isToday && "text-primary")}>
-                        {format(date, "dd/MM")}
-                      </div>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {block.slots.map((slot) => (
-                <tr key={slot.start}>
-                  <td className="sticky left-0 border-b border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">
-                    {slot.start}
-                  </td>
+      {BLOCKS.map((block) => {
+        const columnPlans = weekDates.map((dateStr) => computeColumnPlan(desks, registrations, locks, dateStr, block.slots))
+        return (
+          <div key={block.label} className="min-w-0 overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[560px] border-collapse text-sm">
+              <caption className="sr-only">{block.label}</caption>
+              <thead>
+                <tr>
+                  <th className="sticky left-0 w-14 border-b border-border bg-card p-2 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    {block.label}
+                  </th>
                   {weekDates.map((dateStr) => {
-                    const { totalDesks, matches } = cellRegistrations(desks, registrations, locks, dateStr, slot)
-                    const first = matches[0]
-                    const label =
-                      totalDesks === 0
-                        ? "Không có chỗ"
-                        : matches.length === 0
-                          ? "Còn trống"
-                          : matches.map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName)).join(", ")
+                    const date = parseYmd(dateStr)
+                    const isToday = dateStr === todayStr
                     return (
-                      <td key={dateStr} className="border-b border-l border-border p-0">
-                        <Link
-                          href={`?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`}
-                          // Same fixed light-tint chip look as the day view's
-                          // .rbc-event (app/globals.css) rather than a
-                          // density-scaled opacity — a saturated fill at high
-                          // occupancy would make the name unreadable.
-                          className={cn(
-                            "flex h-7 w-full items-center justify-center gap-1 overflow-hidden px-1 text-[11px] leading-none font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
-                            totalDesks === 0 && "bg-muted"
-                          )}
-                          style={
-                            first
-                              ? { backgroundColor: "color-mix(in oklch, var(--primary) 12%, var(--card))", color: "var(--primary)" }
-                              : undefined
-                          }
-                          aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
-                          title={label}
-                        >
-                          {first && (
-                            <span className="truncate">{first.className ? `${first.studentName} · ${first.className}` : first.studentName}</span>
-                          )}
-                          {matches.length > 1 && <span className="shrink-0 text-muted-foreground">+{matches.length - 1}</span>}
-                        </Link>
-                      </td>
+                      <th
+                        key={dateStr}
+                        className={cn(
+                          "border-b border-l border-border p-2 text-center text-xs font-semibold uppercase",
+                          isToday ? "text-primary" : "text-muted-foreground"
+                        )}
+                      >
+                        <div>{WEEKDAY_LABELS[(date.getDay() + 6) % 7]}</div>
+                        <div className={cn("text-sm font-medium normal-case tabular-nums", isToday && "text-primary")}>
+                          {format(date, "dd/MM")}
+                        </div>
+                      </th>
                     )
                   })}
                 </tr>
-              ))}
-              <tr>
-                <td className="sticky left-0 border-t border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">{block.end}</td>
-                {weekDates.map((dateStr) => (
-                  <td key={dateStr} className="h-7 border-t border-l border-border bg-muted/40" />
+              </thead>
+              <tbody>
+                {block.slots.map((slot, slotIndex) => (
+                  <tr key={slot.start}>
+                    <td className="sticky left-0 border-b border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">
+                      {slot.start}
+                    </td>
+                    {weekDates.map((dateStr, dayIndex) => {
+                      const cell = columnPlans[dayIndex][slotIndex]
+                      if (cell.skip) return null
+                      const { totalDesks, matches, rowSpan } = cell
+                      const first = matches[0]
+                      const phone = first ? phoneByStudentId?.get(first.studentId) : undefined
+                      const label =
+                        totalDesks === 0
+                          ? "Không có chỗ"
+                          : matches.length === 0
+                            ? "Còn trống"
+                            : matches.map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName)).join(", ")
+                      return (
+                        <td key={dateStr} rowSpan={rowSpan} className="border-b border-l border-border p-0 align-middle">
+                          <Link
+                            href={`?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`}
+                            // Same fixed light-tint chip look as the day view's
+                            // .rbc-event (app/globals.css) rather than a
+                            // density-scaled opacity — a saturated fill at high
+                            // occupancy would make the name unreadable.
+                            className={cn(
+                              "flex h-full min-h-7 w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1 py-1 text-center text-[11px] leading-tight font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
+                              totalDesks === 0 && "bg-muted"
+                            )}
+                            style={
+                              first
+                                ? { backgroundColor: "color-mix(in oklch, var(--primary) 12%, var(--card))", color: "var(--primary)" }
+                                : undefined
+                            }
+                            aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
+                            title={label}
+                          >
+                            {first && (
+                              <>
+                                <span className="w-full truncate">{first.studentName}</span>
+                                {first.className && <span className="w-full truncate text-[10px] font-normal opacity-80">{first.className}</span>}
+                                {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
+                              </>
+                            )}
+                            {matches.length > 1 && <span className="shrink-0 text-[10px] font-normal opacity-80">+{matches.length - 1}</span>}
+                          </Link>
+                        </td>
+                      )
+                    })}
+                  </tr>
                 ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ))}
+                <tr>
+                  <td className="sticky left-0 border-t border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">{block.end}</td>
+                  {weekDates.map((dateStr) => (
+                    <td key={dateStr} className="h-7 border-t border-l border-border" />
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )
+      })}
     </div>
   )
 }

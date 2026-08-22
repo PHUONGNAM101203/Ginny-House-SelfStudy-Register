@@ -1,13 +1,13 @@
 import { z } from "zod"
 
 export const sendGuestChatMessageSchema = z.object({
-  registrationId: z.string().uuid(),
-  body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000),
+  registrationId: z.string().uuid("Lịch không hợp lệ"),
+  body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000, "Tin nhắn quá dài"),
 })
 export type SendGuestChatMessageInput = z.infer<typeof sendGuestChatMessageSchema>
 
 export const sendStaffChatMessageSchema = z.object({
-  sessionId: z.string().uuid(),
-  body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000),
+  sessionId: z.string().uuid("Phiên chat không hợp lệ"),
+  body: z.string().trim().min(1, "Vui lòng nhập nội dung").max(1000, "Tin nhắn quá dài"),
 })
 export type SendStaffChatMessageInput = z.infer<typeof sendStaffChatMessageSchema>

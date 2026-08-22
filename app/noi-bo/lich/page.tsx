@@ -1,4 +1,5 @@
 import { requireProfile } from "@/lib/auth"
+import { createServerClient } from "@/lib/supabase/server"
 import { getBranches, getScheduleData, materializeWeek } from "@/lib/schedule-data"
 import { resolveScheduleDates } from "@/lib/schedule-params"
 import { resolveActiveBranchId } from "@/lib/branches"
@@ -23,6 +24,20 @@ export default async function InternalCalendarPage({
   await materializeWeek(monday)
   const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday) : null
 
+  // Phone numbers are staff-only — fetched here with the authenticated
+  // client (passes students' RLS is_staff() check), never through
+  // getScheduleData's anon client (which the guest-facing page also uses;
+  // showing phone there would leak it to any anonymous visitor).
+  let phoneByStudentId = new Map<string, string>()
+  if (schedule && view === "week") {
+    const supabase = await createServerClient()
+    const studentIds = [...new Set(schedule.registrations.map((r) => r.studentId))]
+    if (studentIds.length > 0) {
+      const { data: students } = await supabase.from("students").select("id, phone").in("id", studentIds)
+      phoneByStudentId = new Map((students ?? []).map((s) => [s.id, s.phone]))
+    }
+  }
+
   return (
     <div className="min-w-0">
       <h1 className="mb-4 text-xl font-semibold">Lịch tự học</h1>
@@ -35,6 +50,7 @@ export default async function InternalCalendarPage({
             locks={schedule.locks}
             weekDates={getWeekDates(monday).map(toYmd)}
             branchId={activeBranchId}
+            phoneByStudentId={phoneByStudentId}
           />
         ) : (
           <InternalScheduleGridClient
