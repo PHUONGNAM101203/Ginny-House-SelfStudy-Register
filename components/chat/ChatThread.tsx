@@ -18,7 +18,16 @@ export function ChatThread({
   sessionId: string
   currentRole: "guest" | "staff"
   initialMessages: ChatMessagePayload[]
-  onSend: (body: string) => Promise<void>
+  /**
+   * Returns the sent message (or null on failure) so this component can
+   * render it immediately — it does NOT wait for that message to arrive
+   * back over the realtime channel. The broadcast round-trip exists to
+   * deliver the OTHER party's messages, not the sender's own; relying on it
+   * for your own bubble is racy (the channel may not have finished joining
+   * yet) and was the actual bug behind an earlier "message doesn't show up
+   * after sending" report.
+   */
+  onSend: (body: string) => Promise<ChatMessagePayload | null>
   disabled: boolean
   disabledReason?: string
 }) {
@@ -43,7 +52,8 @@ export function ChatThread({
     setSending(true)
     setDraft("")
     try {
-      await onSend(body)
+      const sent = await onSend(body)
+      if (sent) setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]))
     } finally {
       setSending(false)
     }

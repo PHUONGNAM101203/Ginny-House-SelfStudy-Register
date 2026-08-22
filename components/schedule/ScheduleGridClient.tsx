@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ScheduleGrid, type SlotClickPayload } from "@/components/schedule/ScheduleGrid"
 import { BookingDialog } from "@/components/booking/BookingDialog"
 import { CancelDialog } from "@/components/booking/CancelDialog"
 import { RequestChangeDialog } from "@/components/booking/RequestChangeDialog"
+import { GuestChatWidget, type GuestRegistration } from "@/components/chat/GuestChatWidget"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 
 export function ScheduleGridClient({
@@ -17,6 +18,14 @@ export function ScheduleGridClient({
   // switches to the lower-friction request-and-admin-approves flow instead
   // of closing the dialog outright — see CancelDialog's onRequestChangeInstead.
   const [requestingChange, setRequestingChange] = useState(false)
+
+  // Read once on mount, not during render — localStorage doesn't exist
+  // during SSR. Set by BookingDialog right after a successful booking.
+  const [activeRegistration, setActiveRegistration] = useState<GuestRegistration | null>(null)
+  useEffect(() => {
+    const raw = localStorage.getItem("activeRegistration")
+    if (raw) setActiveRegistration(JSON.parse(raw))
+  }, [])
 
   function closeAll() {
     setSelected(null)
@@ -35,7 +44,14 @@ export function ScheduleGridClient({
           date={selected.date}
           startTime={selected.startTime}
           endTime={selected.endTime}
-          onSuccess={() => router.refresh()}
+          onSuccess={() => {
+            // localStorage was already written by BookingDialog itself
+            // (see its onSubmit) — re-read here so the widget appears
+            // immediately without waiting for a full page reload.
+            const raw = localStorage.getItem("activeRegistration")
+            if (raw) setActiveRegistration(JSON.parse(raw))
+            router.refresh()
+          }}
         />
       )}
       {selected?.registration && !requestingChange && (
@@ -70,6 +86,7 @@ export function ScheduleGridClient({
           }}
         />
       )}
+      {activeRegistration && <GuestChatWidget registration={activeRegistration} />}
     </>
   )
 }

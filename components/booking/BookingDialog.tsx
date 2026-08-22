@@ -70,6 +70,12 @@ export function BookingDialog({
       return
     }
     toast.success("Đăng ký thành công!")
+    // So GuestChatWidget can find this registration on the same browser
+    // tab for the rest of the guest's slot — see ScheduleGridClient.
+    localStorage.setItem(
+      "activeRegistration",
+      JSON.stringify({ id: result.data.id, date: values.date, startTime: values.startTime, endTime: values.endTime })
+    )
     onOpenChange(false)
     onSuccess()
   }
