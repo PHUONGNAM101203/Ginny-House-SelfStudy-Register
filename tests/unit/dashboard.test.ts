@@ -65,7 +65,7 @@ describe("computeOccupancy", () => {
 
 describe("findMissingRegistrations", () => {
   it("flags a student with an active recurring rule but no registration this week", () => {
-    const recurring = [{ studentId: "s1", studentName: "A", dayOfWeek: 1, active: true }]
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0900000001", className: "10A1", dayOfWeek: 1, active: true }]
     const registrations: { studentId: string; date: string }[] = []
     const missing = findMissingRegistrations(recurring, registrations, "2026-08-17")
     expect(missing).toHaveLength(1)
@@ -73,14 +73,14 @@ describe("findMissingRegistrations", () => {
   })
 
   it("does not flag a student who already has a registration this week", () => {
-    const recurring = [{ studentId: "s1", studentName: "A", dayOfWeek: 1, active: true }]
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0900000001", className: "10A1", dayOfWeek: 1, active: true }]
     const registrations = [{ studentId: "s1", date: "2026-08-17" }]
     const missing = findMissingRegistrations(recurring, registrations, "2026-08-17")
     expect(missing).toHaveLength(0)
   })
 
   it("does not flag inactive recurring rules", () => {
-    const recurring = [{ studentId: "s1", studentName: "A", dayOfWeek: 1, active: false }]
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0900000001", className: "10A1", dayOfWeek: 1, active: false }]
     const registrations: { studentId: string; date: string }[] = []
     const missing = findMissingRegistrations(recurring, registrations, "2026-08-17")
     expect(missing).toHaveLength(0)
@@ -90,7 +90,7 @@ describe("findMissingRegistrations", () => {
     // weekMonday: "2026-08-17" is Monday
     // dayOfWeek: 3 means Wednesday, so expected date is 2026-08-19
     // but student registered on 2026-08-17 (Monday instead)
-    const recurring = [{ studentId: "s1", studentName: "A", dayOfWeek: 3, active: true }]
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0900000001", className: "10A1", dayOfWeek: 3, active: true }]
     const registrations = [{ studentId: "s1", date: "2026-08-17" }]
     const missing = findMissingRegistrations(recurring, registrations, "2026-08-17")
     expect(missing).toHaveLength(1)
@@ -100,10 +100,16 @@ describe("findMissingRegistrations", () => {
   it("does not flag a student when registration is on the exact expected day", () => {
     // weekMonday: "2026-08-17" is Monday
     // dayOfWeek: 3 means Wednesday, so expected date is 2026-08-19
-    const recurring = [{ studentId: "s1", studentName: "A", dayOfWeek: 3, active: true }]
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0900000001", className: "10A1", dayOfWeek: 3, active: true }]
     const registrations = [{ studentId: "s1", date: "2026-08-19" }]
     const missing = findMissingRegistrations(recurring, registrations, "2026-08-17")
     expect(missing).toHaveLength(0)
+  })
+
+  it("carries phone and className through so the dashboard panel can display them", () => {
+    const recurring = [{ studentId: "s1", studentName: "A", phone: "0911111111", className: "12C3", dayOfWeek: 1, active: true }]
+    const missing = findMissingRegistrations(recurring, [], "2026-08-17")
+    expect(missing[0]).toEqual({ studentId: "s1", studentName: "A", phone: "0911111111", className: "12C3" })
   })
 })
 

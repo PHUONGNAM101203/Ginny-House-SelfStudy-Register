@@ -64,8 +64,15 @@ export default async function DashboardPage() {
     // aggregation (a view or RPC returning pre-computed metrics) once data volume grows.
     supabase.from("registrations").select("student_id, student_name, desk_id, date, start_time, end_time, status").eq("status", "active").gte("date", eightWeeksAgo).limit(10000),
     supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("active", true),
-    supabase.from("recurring_registrations").select("student_id, student_name, day_of_week, active").eq("active", true),
+    supabase.from("recurring_registrations").select("student_id, student_name, class_name, day_of_week, active").eq("active", true),
   ])
+  // Joined in TS rather than via a PostgREST embed — matches the pattern
+  // already used by app/noi-bo/quan-ly/co-so, and sidesteps PostgREST's
+  // embed-shape ambiguity (object vs single-element array) for a to-one
+  // relation.
+  const recurringStudentIds = [...new Set((recurring ?? []).map((r) => r.student_id))]
+  const { data: recurringStudents } = await supabase.from("students").select("id, phone").in("id", recurringStudentIds)
+  const phoneByStudentId = new Map((recurringStudents ?? []).map((s) => [s.id, s.phone]))
 
   const occupancy = computeOccupancy(
     desks ?? [],
@@ -75,10 +82,38 @@ export default async function DashboardPage() {
   )
 
   const missing = findMissingRegistrations(
-    (recurring ?? []).map((r) => ({ studentId: r.student_id, studentName: r.student_name, dayOfWeek: r.day_of_week, active: r.active })),
+    (recurring ?? []).map((r) => ({
+      studentId: r.student_id,
+      studentName: r.student_name,
+      phone: phoneByStudentId.get(r.student_id) ?? "",
+      className: r.class_name,
+      dayOfWeek: r.day_of_week,
+      active: r.active,
+    })),
     (registrations ?? []).map((r) => ({ studentId: r.student_id, date: r.date })),
     format(monday, "yyyy-MM-dd")
   )
+
+  // Mirror each missing student into the persisted notification log, deduped
+  // by student+week so revisiting the dashboard mid-week doesn't spam
+  // duplicates — history stays even after the student later registers.
+  if (missing.length > 0) {
+    const mondayStr = format(monday, "yyyy-MM-dd")
+    // Best-effort: a failed sync (e.g. a transient network blip) shouldn't
+    // break the dashboard render — the notification is a convenience mirror
+    // of data this panel already displays directly.
+    await supabase.from("notifications").upsert(
+      missing.map((m) => ({
+        type: "missing_registration_weekly" as const,
+        title: "Học sinh chưa đăng ký tuần này",
+        body: m.className ? `${m.studentName} · ${m.className}` : m.studentName,
+        link: "/noi-bo/dashboard",
+        target_role: null,
+        dedupe_key: `missing:${m.studentId}:${mondayStr}`,
+      })),
+      { onConflict: "dedupe_key", ignoreDuplicates: true }
+    )
+  }
 
   const ranking = computeFrequencyRanking(
     (registrations ?? []).map((r) => ({ studentId: r.student_id, studentName: r.student_name, date: r.date, status: r.status })),

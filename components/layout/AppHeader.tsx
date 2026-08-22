@@ -6,10 +6,12 @@ import { CalendarDaysIcon } from "lucide-react"
 import BrandMark from "@/components/brand/BrandMark"
 import { VietnamClock } from "@/components/layout/VietnamClock"
 import { AppLauncher } from "@/components/layout/AppLauncher"
+import { NotificationBell } from "@/components/layout/NotificationBell"
 import { ThemeToggle } from "@/components/layout/ThemeToggle"
 import { UserMenu } from "@/components/layout/UserMenu"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { NotificationItem } from "@/lib/notifications/summary"
 import type { Profile } from "@/types"
 
 /**
@@ -20,7 +22,13 @@ import type { Profile } from "@/types"
  * guest has no account to switch pages from or sign out of), a real Profile
  * once signed in.
  */
-export function AppHeader({ profile }: { profile: Profile | null }) {
+export function AppHeader({
+  profile,
+  notifications,
+}: {
+  profile: Profile | null
+  notifications?: { unreadCount: number; items: NotificationItem[] }
+}) {
   const pathname = usePathname()
   const onCalendar = pathname === "/noi-bo/lich" || pathname === "/"
 
@@ -58,6 +66,10 @@ export function AppHeader({ profile }: { profile: Profile | null }) {
         )}
 
         <ThemeToggle />
+
+        {profile && notifications && (
+          <NotificationBell initialUnreadCount={notifications.unreadCount} items={notifications.items} />
+        )}
 
         {profile && <UserMenu profile={profile} />}
       </div>

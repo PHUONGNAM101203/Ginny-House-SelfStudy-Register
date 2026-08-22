@@ -43,7 +43,7 @@ export function computeOccupancy(
   )
 }
 
-export type MissingStudent = { studentId: string; studentName: string }
+export type MissingStudent = { studentId: string; studentName: string; phone: string; className: string | null }
 
 function addDaysToDateStr(dateStr: string, days: number): string {
   const date = new Date(`${dateStr}T00:00:00Z`)
@@ -52,7 +52,7 @@ function addDaysToDateStr(dateStr: string, days: number): string {
 }
 
 export function findMissingRegistrations(
-  recurring: { studentId: string; studentName: string; dayOfWeek: number; active: boolean }[],
+  recurring: { studentId: string; studentName: string; phone: string; className: string | null; dayOfWeek: number; active: boolean }[],
   registrations: { studentId: string; date: string }[],
   weekMonday: string
 ): MissingStudent[] {
@@ -62,7 +62,7 @@ export function findMissingRegistrations(
       const expectedDate = addDaysToDateStr(weekMonday, r.dayOfWeek - 1)
       return !registrations.some((reg) => reg.studentId === r.studentId && reg.date === expectedDate)
     })
-    .map((r) => ({ studentId: r.studentId, studentName: r.studentName }))
+    .map((r) => ({ studentId: r.studentId, studentName: r.studentName, phone: r.phone, className: r.className }))
 }
 
 export type FrequencyRow = { studentId: string; studentName: string; count: number }

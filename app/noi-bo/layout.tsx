@@ -1,4 +1,5 @@
 import { getSessionProfile } from "@/lib/auth"
+import { getNotificationSummary } from "@/lib/notifications/summary"
 import { AppHeader } from "@/components/layout/AppHeader"
 
 // This layout wraps every route under /noi-bo/*, including /noi-bo/dang-nhap
@@ -20,9 +21,10 @@ export default async function InternalLayout({ children }: { children: React.Rea
   if (!profile) {
     return <>{children}</>
   }
+  const notifications = await getNotificationSummary(profile)
   return (
     <>
-      <AppHeader profile={profile} />
+      <AppHeader profile={profile} notifications={notifications} />
       {/* w-full is load-bearing, not decorative: <main> is a direct flex
           item of <body className="flex h-full flex-col"> (app/layout.tsx).
           A flex item with mx-auto but no explicit width lets the auto
