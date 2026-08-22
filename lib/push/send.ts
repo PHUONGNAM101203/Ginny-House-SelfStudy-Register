@@ -2,11 +2,21 @@ import webpush from "web-push"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Role } from "@/types"
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+// Lazy, not module-top-level: this file is imported by actions/registrations.ts,
+// actions/chat.ts, and the dashboard page, all on the guest/staff critical
+// path. Deploying before VAPID_SUBJECT/NEXT_PUBLIC_VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY
+// are configured in every environment must degrade to "push silently
+// unavailable", never crash module import and take booking/chat/dashboard
+// down with it.
+let vapidConfigured = false
+function ensureVapidConfigured(): boolean {
+  if (vapidConfigured) return true
+  const { VAPID_SUBJECT, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env
+  if (!VAPID_SUBJECT || !NEXT_PUBLIC_VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return false
+  webpush.setVapidDetails(VAPID_SUBJECT, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  vapidConfigured = true
+  return true
+}
 
 export type PushPayload = { title: string; body?: string; link?: string }
 
@@ -20,6 +30,7 @@ export type PushPayload = { title: string; body?: string; link?: string }
  * convention (migration 0006) — null means every internal role, not "nobody".
  */
 export async function sendPushToRole(targetRole: Role | null, payload: PushPayload): Promise<void> {
+  if (!ensureVapidConfigured()) return
   const admin = createAdminClient()
 
   let profileIds: string[] | null = null
