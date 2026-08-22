@@ -18,6 +18,14 @@ export const metadata: Metadata = {
   description: "Đăng ký chỗ tự học cho học sinh Ginny House.",
 };
 
+// Every page here is server-rendered and queries Supabase on every request
+// (no route is fully static — see the "ƒ" markers in `next build`'s route
+// list). The project defaulted to Vercel's iad1 (US East) while the Supabase
+// project runs in ap-southeast-1 (Singapore), so each of those queries paid
+// a trans-Pacific round trip before this. Pinning compute to sin1 puts it in
+// the same region as the database instead.
+export const preferredRegion = "sin1"
+
 export default function RootLayout({
   children,
 }: Readonly<{
