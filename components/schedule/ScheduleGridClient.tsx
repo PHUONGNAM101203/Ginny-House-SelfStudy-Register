@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ScheduleGrid, type SlotClickPayload } from "@/components/schedule/ScheduleGrid"
 import { BookingDialog } from "@/components/booking/BookingDialog"
 import { CancelDialog } from "@/components/booking/CancelDialog"
+import { RequestChangeDialog } from "@/components/booking/RequestChangeDialog"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 
 export function ScheduleGridClient({
@@ -12,6 +13,15 @@ export function ScheduleGridClient({
 }: { desks: Desk[]; date: string; registrations: RegistrationRow[]; locks: SlotLock[] }) {
   const router = useRouter()
   const [selected, setSelected] = useState<SlotClickPayload | null>(null)
+  // Direct self-cancel (exact name/phone match) stays the fast path; this
+  // switches to the lower-friction request-and-admin-approves flow instead
+  // of closing the dialog outright — see CancelDialog's onRequestChangeInstead.
+  const [requestingChange, setRequestingChange] = useState(false)
+
+  function closeAll() {
+    setSelected(null)
+    setRequestingChange(false)
+  }
 
   return (
     <>
@@ -28,7 +38,7 @@ export function ScheduleGridClient({
           onSuccess={() => router.refresh()}
         />
       )}
-      {selected?.registration && (
+      {selected?.registration && !requestingChange && (
         <CancelDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
@@ -37,6 +47,27 @@ export function ScheduleGridClient({
           startTime={selected.startTime}
           endTime={selected.endTime}
           onSuccess={() => router.refresh()}
+          onRequestChangeInstead={() => setRequestingChange(true)}
+        />
+      )}
+      {selected?.registration && requestingChange && (
+        <RequestChangeDialog
+          open
+          onOpenChange={(v) => !v && closeAll()}
+          registrationId={selected.registration.id}
+          deskLabel={selected.desk.label}
+          date={selected.date}
+          startTime={selected.startTime}
+          endTime={selected.endTime}
+          studentName={selected.registration.studentName}
+          className={selected.registration.className}
+          desks={desks}
+          registrations={registrations}
+          locks={locks}
+          onSuccess={() => {
+            closeAll()
+            router.refresh()
+          }}
         />
       )}
     </>

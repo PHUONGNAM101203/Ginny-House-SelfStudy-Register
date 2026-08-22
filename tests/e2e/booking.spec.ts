@@ -47,6 +47,7 @@ test("guest books a slot, it appears on the grid, wrong-credential cancel is rej
 
   await page.getByLabel("Họ tên").fill("Playwright Tester")
   await page.getByLabel("Số điện thoại").fill("0912345678")
+  await page.getByLabel("Tên lớp").fill("10A1")
   await page.getByRole("button", { name: "Xác nhận" }).click()
 
   await expect(page.getByText("Đăng ký thành công!")).toBeVisible()

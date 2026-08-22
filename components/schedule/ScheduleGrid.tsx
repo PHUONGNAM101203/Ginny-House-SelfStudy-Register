@@ -151,7 +151,8 @@ export function ScheduleGrid({
     .filter((r) => r.date === dateStr)
     .map((r) => ({
       id: r.id,
-      title: r.studentName,
+      // Gin Anh: the chip needs to name which class booked it, not just who.
+      title: r.className ? `${r.studentName} · ${r.className}` : r.studentName,
       start: timeOnDate(date, r.startTime),
       end: timeOnDate(date, r.endTime),
       resourceId: r.deskId,

@@ -29,7 +29,7 @@ export function BookingDialog({
     CreateRegistrationInput
   >({
     resolver: zodResolver(createRegistrationSchema),
-    defaultValues: { deskId, date, startTime, endTime, isRecurring: false },
+    defaultValues: { deskId, date, startTime, endTime, className: "", isRecurring: false },
   })
 
   async function onSubmit(values: CreateRegistrationInput) {
@@ -63,6 +63,11 @@ export function BookingDialog({
             <Label htmlFor="phone">Số điện thoại</Label>
             <Input id="phone" {...register("phone")} />
             {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="className">Tên lớp</Label>
+            <Input id="className" {...register("className")} />
+            {errors.className && <p className="text-sm text-destructive">{errors.className.message}</p>}
           </div>
           <label className="flex items-center gap-2 text-sm">
             {/* accent-* keeps the native control on the brand colour instead of

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Grid3x3Icon, Building2Icon, LockIcon, GraduationCapIcon, UsersIcon } from "lucide-react"
+import { Grid3x3Icon, Building2Icon, LockIcon, GraduationCapIcon, UsersIcon, ClipboardCheckIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 
@@ -13,6 +13,7 @@ const APPS = [
   { href: "/noi-bo/quan-ly/khoa-lich", label: "Khoá lịch", icon: LockIcon },
   { href: "/noi-bo/quan-ly/hoc-sinh", label: "Học sinh", icon: GraduationCapIcon },
   { href: "/noi-bo/quan-ly/nhan-su", label: "Nhân sự", icon: UsersIcon },
+  { href: "/noi-bo/quan-ly/yeu-cau-doi-lich", label: "Yêu cầu huỷ/đổi", icon: ClipboardCheckIcon },
 ] as const
 
 export function AppLauncher() {

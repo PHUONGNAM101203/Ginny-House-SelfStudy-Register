@@ -19,18 +19,6 @@ export const metadata: Metadata = {
   description: "Đăng ký chỗ tự học cho học sinh Ginny House.",
 };
 
-// Every page here is server-rendered and queries Supabase on every request
-// (no route is fully static — see the "ƒ" markers in `next build`'s route
-// list). The project defaulted to Vercel's iad1 (US East) while the Supabase
-// project runs in ap-southeast-1 (Singapore), so each of those queries paid
-// a trans-Pacific round trip before this. The Next.js docs frame this export
-// as the way to pin a route's compute region; on this deployment it alone
-// had no effect (`vercel inspect` kept showing [iad1] after deploying with
-// only this present) — vercel.json's `regions` key at the project root is
-// what actually moved the built functions to [sin1], verified the same way.
-// Left in place since it's harmless and matches vercel.json's choice.
-export const preferredRegion = "sin1"
-
 export default function RootLayout({
   children,
 }: Readonly<{

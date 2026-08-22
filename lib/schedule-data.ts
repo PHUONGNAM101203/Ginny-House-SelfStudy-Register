@@ -6,7 +6,16 @@ import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { addWeeks, format } from "date-fns"
 
 export type Desk = { id: string; label: string }
-export type RegistrationRow = { id: string; deskId: string; date: string; startTime: string; endTime: string; studentName: string }
+export type RegistrationRow = {
+  id: string
+  deskId: string
+  date: string
+  startTime: string
+  endTime: string
+  studentName: string
+  /** Null for rows created before this field existed (migration 0005). */
+  className: string | null
+}
 export type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
 export async function getScheduleData(branchId: string, weekMonday: Date) {
@@ -21,7 +30,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true),
     supabase
       .from("registrations")
-      .select("id, desk_id, date, start_time, end_time, student_name")
+      .select("id, desk_id, date, start_time, end_time, student_name, class_name")
       .eq("branch_id", branchId)
       .eq("status", "active")
       .gte("date", from)
@@ -43,6 +52,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
       startTime: toHm(r.start_time),
       endTime: toHm(r.end_time),
       studentName: r.student_name,
+      className: r.class_name,
     })) as RegistrationRow[],
     locks: (locks ?? []).map((l) => ({
       deskId: l.desk_id,

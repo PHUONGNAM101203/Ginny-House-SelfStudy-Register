@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
-import { createRegistrationSchema, cancelRegistrationSchema } from "@/lib/validations/registration"
+import {
+  createRegistrationSchema,
+  cancelRegistrationSchema,
+  adminCancelRegistrationSchema,
+  requestChangeSchema,
+  reviewChangeRequestSchema,
+} from "@/lib/validations/registration"
 import type { ActionResult } from "@/types"
 import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
@@ -21,6 +27,7 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
     p_end_time: parsed.data.endTime,
     p_full_name: parsed.data.fullName,
     p_phone: parsed.data.phone,
+    p_class_name: parsed.data.className,
     p_is_recurring: parsed.data.isRecurring,
     p_admin_created: false,
   })
@@ -80,6 +87,7 @@ export async function createRegistrationAsAdminAction(input: unknown): Promise<A
     p_end_time: parsed.data.endTime,
     p_full_name: parsed.data.fullName,
     p_phone: parsed.data.phone,
+    p_class_name: parsed.data.className,
     p_is_recurring: parsed.data.isRecurring,
     p_admin_created: true,
   })
@@ -114,6 +122,90 @@ export async function deactivateRecurringRegistrationAction(id: string): Promise
 
   revalidatePath("/noi-bo/quan-ly/hoc-sinh")
   revalidatePath("/noi-bo/dashboard")
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/")
+  return { ok: true, data: null }
+}
+
+/**
+ * Admin's direct cancel from the internal calendar — no name/phone match.
+ *
+ * Calls the same cancel_registration RPC as the guest path, but through the
+ * authenticated server client (not the anon one createRegistrationAction
+ * uses), so auth.uid() resolves inside the RPC and its `is_admin()` branch
+ * (see migration 0002) short-circuits before the name/phone check ever runs.
+ */
+export async function cancelRegistrationAsAdminAction(input: unknown): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const parsed = adminCancelRegistrationSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = await createServerClient()
+  const { error } = await supabase.rpc("cancel_registration", {
+    p_registration_id: parsed.data.registrationId,
+  })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/")
+  return { ok: true, data: null }
+}
+
+/**
+ * A guest's "phiếu xin xoá + đổi lịch" — lower-friction than the direct
+ * self-cancel path (no exact name/phone match against the original booking),
+ * queued for admin review instead of taking effect immediately.
+ */
+export async function requestRegistrationChangeAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const parsed = requestChangeSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = createPublicClient()
+  const { data, error } = await supabase.rpc("request_registration_change", {
+    p_registration_id: parsed.data.registrationId,
+    p_kind: parsed.data.kind,
+    p_requested_by_name: parsed.data.requestedByName,
+    p_requested_by_phone: parsed.data.requestedByPhone,
+    p_reason: parsed.data.reason,
+    p_new_desk_id: parsed.data.newDeskId ?? null,
+    p_new_date: parsed.data.newDate ?? null,
+    p_new_start_time: parsed.data.newStartTime ?? null,
+    p_new_end_time: parsed.data.newEndTime ?? null,
+  })
+
+  if (error) {
+    // registration_change_requests_one_pending_idx (migration 0005): a
+    // second request for the same booking while one is still pending.
+    if (error.code === "23505") {
+      return { ok: false, error: "Bạn đã gửi yêu cầu cho lịch này rồi, vui lòng chờ admin duyệt" }
+    }
+    return { ok: false, error: "Có lỗi xảy ra, vui lòng thử lại" }
+  }
+
+  return { ok: true, data: { id: data.id } }
+}
+
+/** Admin approves or rejects a pending change request (see review_registration_change, migration 0005). */
+export async function reviewRegistrationChangeAction(input: unknown): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const parsed = reviewChangeRequestSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = await createServerClient()
+  const { error } = await supabase.rpc("review_registration_change", {
+    p_request_id: parsed.data.requestId,
+    p_approve: parsed.data.approve,
+    p_admin_note: parsed.data.adminNote ?? null,
+  })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/quan-ly/yeu-cau-doi-lich")
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
   return { ok: true, data: null }

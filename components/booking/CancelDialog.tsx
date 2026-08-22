@@ -12,11 +12,13 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
 export function CancelDialog({
-  open, onOpenChange, registrationId, deskLabel, startTime, endTime, onSuccess,
+  open, onOpenChange, registrationId, deskLabel, startTime, endTime, onSuccess, onRequestChangeInstead,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void
   registrationId: string; deskLabel: string; startTime: string; endTime: string
   onSuccess: () => void
+  /** Offered when a guest can't remember the exact name/phone they registered with — see RequestChangeDialog. */
+  onRequestChangeInstead?: () => void
 }) {
   const [submitting, setSubmitting] = useState(false)
   const { register, handleSubmit, formState: { errors } } = useForm<CancelRegistrationInput>({
@@ -56,6 +58,15 @@ export function CancelDialog({
             <Input id="phone" {...register("phone")} />
             {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
           </div>
+          {onRequestChangeInstead && (
+            <button
+              type="button"
+              onClick={onRequestChangeInstead}
+              className="text-left text-sm text-primary underline-offset-4 hover:underline"
+            >
+              Không nhớ chính xác tên/SĐT đã đăng ký? Gửi yêu cầu để admin xử lý
+            </button>
+          )}
           <DialogFooter>
             <Button type="submit" variant="destructive" disabled={submitting}>
               {submitting ? "Đang huỷ..." : "Xác nhận huỷ"}
