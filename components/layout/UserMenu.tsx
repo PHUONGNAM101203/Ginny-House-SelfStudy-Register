@@ -49,11 +49,11 @@ export function UserMenu({ profile }: { profile: Profile }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-full py-1 pr-2.5 pl-1 outline-none transition-colors hover:bg-accent">
+      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-full py-1 pr-2 pl-1 outline-none transition-colors hover:bg-accent sm:gap-2 sm:pr-2.5">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
           {initial}
         </span>
-        <span className="max-w-24 truncate text-sm font-medium sm:max-w-none">{displayName}</span>
+        <span className="max-w-12 truncate text-sm font-medium sm:max-w-none">{displayName}</span>
         <ChevronDownIcon className="size-3.5 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { BellIcon } from "lucide-react"
+import { toast } from "sonner"
+import { BellIcon, BellRingIcon, BellOffIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
 import { markNotificationsReadAction } from "@/actions/notifications"
+import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -18,6 +20,20 @@ import {
 import { cn } from "@/lib/utils"
 import type { NotificationItem } from "@/lib/notifications/summary"
 
+// Web Push's applicationServerKey wants a raw Uint8Array, but the VAPID
+// public key is handed out as URL-safe base64 — same conversion every
+// web-push guide reproduces verbatim, no library needed for one function.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(new ArrayBuffer(rawData.length))
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i)
+  return outputArray
+}
+
+type PushSupport = "checking" | "unsupported" | "subscribed" | "unsubscribed"
+
 // Read state is marked the moment the dropdown opens (all currently-unread
 // items at once) rather than per-item on click — the badge exists to say
 // "something happened since you last looked", not to track which specific
@@ -25,6 +41,24 @@ import type { NotificationItem } from "@/lib/notifications/summary"
 export function NotificationBell({ initialUnreadCount, items }: { initialUnreadCount: number; items: NotificationItem[] }) {
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [, startTransition] = useTransition()
+  const [pushState, setPushState] = useState<PushSupport>("checking")
+
+  useEffect(() => {
+    async function checkPushStatus() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushState("unsupported")
+        return
+      }
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js")
+        const subscription = await registration.pushManager.getSubscription()
+        setPushState(subscription ? "subscribed" : "unsubscribed")
+      } catch {
+        setPushState("unsupported")
+      }
+    }
+    checkPushStatus()
+  }, [])
 
   function handleOpenChange(open: boolean) {
     if (!open || unreadCount === 0) return
@@ -33,6 +67,42 @@ export function NotificationBell({ initialUnreadCount, items }: { initialUnreadC
     startTransition(() => {
       markNotificationsReadAction(unreadIds)
     })
+  }
+
+  async function subscribeToPush() {
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!publicKey) return toast.error("Chưa cấu hình thông báo đẩy")
+
+    const permission = await Notification.requestPermission()
+    if (permission !== "granted") {
+      toast.error("Bạn đã từ chối quyền thông báo — hãy bật lại trong cài đặt trình duyệt")
+      return
+    }
+
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    })
+    const json = subscription.toJSON()
+    const result = await subscribeToPushAction({ endpoint: json.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth })
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    setPushState("subscribed")
+    toast.success("Đã bật thông báo đẩy trên thiết bị này")
+  }
+
+  async function unsubscribeFromPush() {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+    if (subscription) {
+      await unsubscribeFromPushAction({ endpoint: subscription.endpoint })
+      await subscription.unsubscribe()
+    }
+    setPushState("unsubscribed")
+    toast.success("Đã tắt thông báo đẩy trên thiết bị này")
   }
 
   return (
@@ -71,6 +141,21 @@ export function NotificationBell({ initialUnreadCount, items }: { initialUnreadC
               )
             })}
           </div>
+        )}
+        {(pushState === "subscribed" || pushState === "unsubscribed") && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault()
+                pushState === "subscribed" ? unsubscribeFromPush() : subscribeToPush()
+              }}
+              className="gap-2 text-muted-foreground"
+            >
+              {pushState === "subscribed" ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
+              {pushState === "subscribed" ? "Đã bật thông báo đẩy trên thiết bị này" : "Bật thông báo đẩy trên thiết bị này"}
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

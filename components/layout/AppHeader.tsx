@@ -7,7 +7,6 @@ import BrandMark from "@/components/brand/BrandMark"
 import { VietnamClock } from "@/components/layout/VietnamClock"
 import { AppLauncher } from "@/components/layout/AppLauncher"
 import { NotificationBell } from "@/components/layout/NotificationBell"
-import { PushNotificationToggle } from "@/components/layout/PushNotificationToggle"
 import { ThemeToggle } from "@/components/layout/ThemeToggle"
 import { UserMenu } from "@/components/layout/UserMenu"
 import { Button } from "@/components/ui/button"
@@ -34,18 +33,13 @@ export function AppHeader({
   const onCalendar = pathname === "/noi-bo/lich" || pathname === "/"
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/70 sm:px-6">
-      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 shrink-0 items-center gap-2 text-primary">
+    <header className="sticky top-0 z-40 flex items-center justify-between gap-1.5 border-b bg-background/80 px-2.5 py-3 backdrop-blur supports-backdrop-filter:bg-background/70 sm:gap-3 sm:px-6">
+      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 shrink-0 items-center gap-1.5 text-primary sm:gap-2">
         <BrandMark className="size-6 shrink-0" priority />
-        {/* Hidden rather than truncated below sm: the internal header's
-            right-side cluster (calendar/launcher/theme/avatar) leaves so
-            little room on a phone that "Ginny House" truncated to "G.." —
-            illegible, not just tight. The icon alone still carries the
-            brand at that width. */}
-        <span className="hidden text-lg leading-none font-semibold tracking-tight sm:inline">Ginny House</span>
+        <span className="text-base leading-none font-semibold tracking-tight sm:text-lg">Ginny House</span>
       </Link>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
         <VietnamClock className="hidden sm:flex" />
 
         {profile && (
@@ -67,8 +61,6 @@ export function AppHeader({
         )}
 
         <ThemeToggle />
-
-        {profile && <PushNotificationToggle />}
 
         {profile && notifications && (
           <NotificationBell initialUnreadCount={notifications.unreadCount} items={notifications.items} />
