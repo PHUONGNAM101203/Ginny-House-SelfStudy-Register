@@ -27,9 +27,11 @@ export default async function InternalCalendarPage({
   // Phone numbers are staff-only — fetched here with the authenticated
   // client (passes students' RLS is_staff() check), never through
   // getScheduleData's anon client (which the guest-facing page also uses;
-  // showing phone there would leak it to any anonymous visitor).
+  // showing phone there would leak it to any anonymous visitor). Needed for
+  // both views now — was previously gated to week only, which silently left
+  // the day view (ScheduleGrid) without phone at all.
   let phoneByStudentId = new Map<string, string>()
-  if (schedule && view === "week") {
+  if (schedule) {
     const supabase = await createServerClient()
     const studentIds = [...new Set(schedule.registrations.map((r) => r.studentId))]
     if (studentIds.length > 0) {
@@ -56,6 +58,7 @@ export default async function InternalCalendarPage({
           <InternalScheduleGridClient
             desks={schedule.desks} date={selectedDate} registrations={schedule.registrations} locks={schedule.locks}
             canBook={profile.role === "admin"}
+            phoneByStudentId={phoneByStudentId}
           />
         ))}
     </div>

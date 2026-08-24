@@ -24,6 +24,23 @@ type BookingEvent = {
   registration: RegistrationRow
 }
 
+/**
+ * Stacked name/class/phone, same staff-only-phone treatment as
+ * WeekOverview's merged card — `phoneByStudentId` is only ever populated on
+ * the internal page (see app/noi-bo/lich/page.tsx), never the guest-facing
+ * one, so this silently degrades to name+class when undefined.
+ */
+function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneByStudentId?: Map<string, string> }) {
+  const phone = phoneByStudentId?.get(event.registration.studentId)
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="truncate">{event.registration.studentName}</span>
+      {event.registration.className && <span className="truncate font-normal opacity-80">{event.registration.className}</span>}
+      {phone && <span className="truncate font-normal opacity-80">{phone}</span>}
+    </div>
+  )
+}
+
 // RBC's dateFnsLocalizer only ever calls `format`, `startOfWeek`, and `getDay`
 // internally (verified against the installed package) — `parse` is commonly
 // imported alongside by convention but is unused here, so it's omitted.
@@ -123,13 +140,15 @@ function ceilToSlot(date: Date): Date {
  * DateNavigator, above and outside this component's scroll container.
  */
 export function ScheduleGrid({
-  desks, date: dateStr, registrations, locks, onSlotClick,
+  desks, date: dateStr, registrations, locks, onSlotClick, phoneByStudentId,
 }: {
   desks: Desk[]
   /** "yyyy-MM-dd" — a calendar day, not an instant (see lib/vn-date.ts). */
   date: string
   registrations: RegistrationRow[]; locks: SlotLock[]
   onSlotClick: (payload: SlotClickPayload) => void
+  /** Staff-only — omitted entirely on the guest-facing page (see ScheduleGridClient). */
+  phoneByStudentId?: Map<string, string>
 }) {
   // Rebuilt as local midnight here rather than handed over as a Date: a Date is
   // an instant, so it would render as the previous calendar day in any browser
@@ -323,6 +342,7 @@ export function ScheduleGrid({
                 onSelectSlot={handleSelectSlot}
                 onSelectEvent={handleSelectEvent}
                 slotPropGetter={makeSlotPropGetter(block.end)}
+                components={{ event: (props) => <EventContent {...props} phoneByStudentId={phoneByStudentId} /> }}
               />
             </section>
           ))}
