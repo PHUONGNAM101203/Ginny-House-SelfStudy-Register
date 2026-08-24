@@ -221,8 +221,10 @@ export function WeekOverview({
                           >
                             {first && (
                               <>
-                                <span className="w-full truncate">{first.studentName}</span>
-                                {first.className && <span className="w-full truncate text-[10px] font-normal opacity-80">{first.className}</span>}
+                                <span className="w-full truncate">
+                                  {first.studentName}
+                                  {first.className && ` · ${first.className}`}
+                                </span>
                                 {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
                               </>
                             )}

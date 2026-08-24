@@ -34,8 +34,10 @@ function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneB
   const phone = phoneByStudentId?.get(event.registration.studentId)
   return (
     <div className="flex flex-col leading-tight">
-      <span className="truncate">{event.registration.studentName}</span>
-      {event.registration.className && <span className="truncate font-normal opacity-80">{event.registration.className}</span>}
+      <span className="truncate">
+        {event.registration.studentName}
+        {event.registration.className && ` · ${event.registration.className}`}
+      </span>
       {phone && <span className="truncate font-normal opacity-80">{phone}</span>}
     </div>
   )
