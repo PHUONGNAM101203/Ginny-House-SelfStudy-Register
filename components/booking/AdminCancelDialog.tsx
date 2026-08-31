@@ -22,6 +22,7 @@ export function AdminCancelDialog({
   className,
   startTime,
   endTime,
+  recurringRegistrationId,
   onSuccess,
 }: {
   open: boolean
@@ -32,6 +33,7 @@ export function AdminCancelDialog({
   className: string | null
   startTime: string
   endTime: string
+  recurringRegistrationId: string | null
   onSuccess: () => void
 }) {
   const [submitting, setSubmitting] = useState(false)
@@ -57,6 +59,8 @@ export function AdminCancelDialog({
           <DialogDescription>
             {studentName}
             {className ? ` · Lớp ${className}` : ""}
+            <br />
+            {recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
