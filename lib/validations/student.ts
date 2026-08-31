@@ -8,6 +8,13 @@ export const createStudentSchema = z.object({
 })
 export type CreateStudentInput = z.infer<typeof createStudentSchema>
 
+export const updateStudentSchema = z.object({
+  id: z.string().uuid("Học sinh không hợp lệ"),
+  fullName: z.string().trim().min(2, "Tên quá ngắn").max(100, "Tên quá dài"),
+  phone: z.string().regex(phoneRegex, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),
+})
+export type UpdateStudentInput = z.infer<typeof updateStudentSchema>
+
 const larkRowSchema = z.object({
   fullName: z.string().trim().min(2, "Tên quá ngắn").max(100, "Tên quá dài"),
   phone: z.string().regex(phoneRegex, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),

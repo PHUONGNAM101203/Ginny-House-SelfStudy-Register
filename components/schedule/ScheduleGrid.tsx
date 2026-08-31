@@ -39,6 +39,9 @@ function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneB
         {event.registration.className && ` · ${event.registration.className}`}
       </span>
       {phone && <span className="truncate font-normal opacity-80">{phone}</span>}
+      <span className="truncate font-normal opacity-70">
+        {event.registration.recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
+      </span>
     </div>
   )
 }

@@ -2,6 +2,12 @@
 
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+// Sonner ships its color/layout rules as a separate stylesheet rather than
+// injecting them at runtime — without this import every toast falls back to
+// unstyled browser defaults (a plain box, no success/error color at all),
+// which is why success and error toasts looked identical/black instead of
+// green/red.
+import "sonner/dist/styles.css"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
@@ -10,6 +16,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      richColors
       className="toaster group"
       icons={{
         success: (

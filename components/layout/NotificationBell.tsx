@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { BellIcon, BellRingIcon, BellOffIcon } from "lucide-react"
+import { BellIcon, BellRingIcon, BellOffIcon, XIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
-import { markNotificationsReadAction } from "@/actions/notifications"
+import { markNotificationsReadAction, deleteNotificationAction } from "@/actions/notifications"
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push"
+import { subscribeToNotifications } from "@/lib/notification-realtime"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -34,14 +36,28 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 
 type PushSupport = "checking" | "unsupported" | "subscribed" | "unsubscribed"
 
-// Read state is marked the moment the dropdown opens (all currently-unread
-// items at once) rather than per-item on click — the badge exists to say
-// "something happened since you last looked", not to track which specific
-// item you engaged with.
-export function NotificationBell({ initialUnreadCount, items }: { initialUnreadCount: number; items: NotificationItem[] }) {
+// Read state is per-item now: clicking one notification marks only that one
+// read and drops the badge by exactly one, rather than the dropdown opening
+// silently clearing everything at once.
+export function NotificationBell({ initialUnreadCount, items: initialItems }: { initialUnreadCount: number; items: NotificationItem[] }) {
+  const router = useRouter()
+  const [items, setItems] = useState(initialItems)
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [, startTransition] = useTransition()
   const [pushState, setPushState] = useState<PushSupport>("checking")
+
+  // Props change on every router.refresh() the realtime subscription below
+  // triggers — local state has to re-sync from them each time, or a
+  // useState(initialX) would only ever reflect the very first server render
+  // (the "read prop once at mount" footgun this codebase has hit before).
+  useEffect(() => {
+    setItems(initialItems)
+    setUnreadCount(initialUnreadCount)
+  }, [initialItems, initialUnreadCount])
+
+  useEffect(() => {
+    return subscribeToNotifications(() => router.refresh())
+  }, [router])
 
   useEffect(() => {
     async function checkPushStatus() {
@@ -60,13 +76,20 @@ export function NotificationBell({ initialUnreadCount, items }: { initialUnreadC
     checkPushStatus()
   }, [])
 
-  function handleOpenChange(open: boolean) {
-    if (!open || unreadCount === 0) return
-    const unreadIds = items.filter((i) => !i.read).map((i) => i.id)
-    setUnreadCount(0)
+  function markOneRead(item: NotificationItem) {
+    if (item.read) return
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, read: true } : i)))
+    setUnreadCount((c) => Math.max(0, c - 1))
     startTransition(() => {
-      markNotificationsReadAction(unreadIds)
+      markNotificationsReadAction([item.id])
     })
+  }
+
+  async function deleteItem(item: NotificationItem) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id))
+    if (!item.read) setUnreadCount((c) => Math.max(0, c - 1))
+    const result = await deleteNotificationAction(item.id)
+    if (!result.ok) toast.error(result.error)
   }
 
   async function subscribeToPush() {
@@ -106,7 +129,7 @@ export function NotificationBell({ initialUnreadCount, items }: { initialUnreadC
   }
 
   return (
-    <DropdownMenu onOpenChange={handleOpenChange}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" className="relative rounded-full" aria-label="Thông báo">
           <BellIcon className="size-5" />
@@ -135,8 +158,49 @@ export function NotificationBell({ initialUnreadCount, items }: { initialUnreadC
                 </div>
               )
               return (
-                <DropdownMenuItem key={item.id} asChild={!!item.link} className="items-start">
-                  {item.link ? <Link href={item.link}>{content}</Link> : content}
+                <DropdownMenuItem
+                  key={item.id}
+                  asChild={!!item.link}
+                  className="items-start gap-1 pr-1"
+                  onSelect={(e) => {
+                    if (item.link) return // Link's own navigation already fires; onClick below still marks it read.
+                    e.preventDefault()
+                    markOneRead(item)
+                  }}
+                >
+                  {item.link ? (
+                    <Link href={item.link} onClick={() => markOneRead(item)} className="flex items-start justify-between gap-1">
+                      {content}
+                      <button
+                        type="button"
+                        aria-label="Xoá thông báo"
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          deleteItem(item)
+                        }}
+                      >
+                        <XIcon className="size-3.5" />
+                      </button>
+                    </Link>
+                  ) : (
+                    <div className="flex w-full items-start justify-between gap-1">
+                      {content}
+                      <button
+                        type="button"
+                        aria-label="Xoá thông báo"
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          deleteItem(item)
+                        }}
+                      >
+                        <XIcon className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </DropdownMenuItem>
               )
             })}

@@ -6,7 +6,17 @@ import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
 
 type Desk = { id: string; label: string }
-type Registration = { id: string; studentId: string; deskId: string; date: string; startTime: string; endTime: string; studentName: string; className: string | null }
+type Registration = {
+  id: string
+  studentId: string
+  deskId: string
+  date: string
+  startTime: string
+  endTime: string
+  studentName: string
+  className: string | null
+  recurringRegistrationId: string | null
+}
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
 // Same weekday abbreviations as DateNavigator's own strip, so the two read
@@ -226,6 +236,9 @@ export function WeekOverview({
                                   {first.className && ` · ${first.className}`}
                                 </span>
                                 {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
+                                <span className="w-full truncate text-[10px] font-normal opacity-70">
+                                  {first.recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
+                                </span>
                               </>
                             )}
                             {matches.length > 1 && <span className="shrink-0 text-[10px] font-normal opacity-80">+{matches.length - 1}</span>}

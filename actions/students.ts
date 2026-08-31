@@ -3,7 +3,7 @@
 import { revalidatePath, refresh } from "next/cache"
 import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
-import { createStudentSchema, importStudentsSchema, createRecurringScheduleSchema } from "@/lib/validations/student"
+import { createStudentSchema, updateStudentSchema, importStudentsSchema, createRecurringScheduleSchema } from "@/lib/validations/student"
 import type { ActionResult } from "@/types"
 
 export async function getStudentHistoryAction(studentId: string) {
@@ -37,6 +37,49 @@ export async function createStudentAction(input: unknown): Promise<ActionResult<
   // "Refresh data" vs "Revalidate data" split, added in this Next version).
   refresh()
   return { ok: true, data: { id: data.id } }
+}
+
+export async function updateStudentAction(input: unknown): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const parsed = updateStudentSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+
+  const supabase = await createServerClient()
+  const { error } = await supabase
+    .from("students")
+    .update({ full_name: parsed.data.fullName, phone: parsed.data.phone })
+    .eq("id", parsed.data.id)
+  if (error) return { ok: false, error: error.code === "23505" ? "Số điện thoại đã được dùng bởi học sinh khác" : error.message }
+
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  refresh()
+  return { ok: true, data: null }
+}
+
+/**
+ * `students.id` cascades to registrations/recurring_registrations (see
+ * migration 0001) — a hard delete on a student with any booking history
+ * would silently erase that history. Blocked here the same way
+ * deleteDeskAction guards desks.
+ */
+export async function deleteStudentAction(studentId: string): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const supabase = await createServerClient()
+
+  const [{ count: regCount }, { count: recurringCount }] = await Promise.all([
+    supabase.from("registrations").select("id", { count: "exact", head: true }).eq("student_id", studentId),
+    supabase.from("recurring_registrations").select("id", { count: "exact", head: true }).eq("student_id", studentId),
+  ])
+  if ((regCount && regCount > 0) || (recurringCount && recurringCount > 0)) {
+    return { ok: false, error: "Học sinh này đã có lịch sử đăng ký — không thể xoá để giữ lịch sử" }
+  }
+
+  const { error } = await supabase.from("students").delete().eq("id", studentId)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  refresh()
+  return { ok: true, data: null }
 }
 
 /** Batch upsert parsed from a Lark Base CSV export — same shape scripts/import-lark.ts's CLI reads. */

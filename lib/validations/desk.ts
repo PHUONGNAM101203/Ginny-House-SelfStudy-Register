@@ -6,3 +6,9 @@ export const deskSchema = z.object({
   active: z.boolean().default(true),
 })
 export type DeskInput = z.infer<typeof deskSchema>
+
+export const updateDeskSchema = z.object({
+  id: z.string().uuid("Chỗ không hợp lệ"),
+  label: z.string().trim().min(1, "Vui lòng nhập tên chỗ").max(50, "Tên chỗ quá dài"),
+})
+export type UpdateDeskInput = z.infer<typeof updateDeskSchema>

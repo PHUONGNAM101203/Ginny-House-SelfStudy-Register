@@ -38,6 +38,15 @@ export async function proxy(request: NextRequest) {
   if (path === "/noi-bo/dang-nhap" && user) {
     return NextResponse.redirect(new URL("/noi-bo/lich", request.url))
   }
+  // A signed-in staff member landing on "/" (the guest booking page — e.g. a
+  // bookmark or typing the bare domain, not a deep link into /noi-bo) has a
+  // perfectly valid session but app/page.tsx has no auth awareness of its
+  // own — it unconditionally renders profile={null}, so the session
+  // *looked* dropped even though it was never invalid. Same redirect
+  // /noi-bo/dang-nhap already gets for a signed-in visitor, applied here too.
+  if (path === "/" && user) {
+    return NextResponse.redirect(new URL("/noi-bo/lich", request.url))
+  }
 
   return response
 }

@@ -16,6 +16,13 @@ export type RegistrationRow = {
   studentName: string
   /** Null for rows created before this field existed (migration 0005). */
   className: string | null
+  /**
+   * Non-null on every slot tied to a recurring schedule — including the very
+   * first slot booked at the moment the "lịch cố định" checkbox is used
+   * (create_registration sets this on the initial row too, not just the
+   * later auto-materialized weeks — see migration 0002).
+   */
+  recurringRegistrationId: string | null
 }
 export type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
@@ -31,7 +38,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true),
     supabase
       .from("registrations")
-      .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name")
+      .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name, recurring_registration_id")
       .eq("branch_id", branchId)
       .eq("status", "active")
       .gte("date", from)
@@ -55,6 +62,7 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
       endTime: toHm(r.end_time),
       studentName: r.student_name,
       className: r.class_name,
+      recurringRegistrationId: r.recurring_registration_id,
     })) as RegistrationRow[],
     locks: (locks ?? []).map((l) => ({
       deskId: l.desk_id,

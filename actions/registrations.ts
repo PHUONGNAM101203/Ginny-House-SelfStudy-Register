@@ -3,6 +3,7 @@
 import { revalidatePath, refresh } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
 import { sendPushToRole } from "@/lib/push/send"
+import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
 import {
   createRegistrationSchema,
   cancelRegistrationSchema,
@@ -70,6 +71,7 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
   }
 
   revalidatePath("/")
+  void broadcastNotificationsUpdate()
   return { ok: true, data: { id: data.id } }
 }
 
@@ -177,6 +179,11 @@ export async function cancelRegistrationAsAdminAction(input: unknown): Promise<A
 
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
+  // onClick-invoked (AdminCancelDialog's button, not a <form action>) —
+  // revalidatePath alone doesn't push a refresh to the caller in this
+  // Next.js version, so the cancelled booking stayed visible on the
+  // calendar until a manual reload.
+  refresh()
   return { ok: true, data: null }
 }
 
@@ -221,6 +228,7 @@ export async function requestRegistrationChangeAction(input: unknown): Promise<A
     body: parsed.data.requestedByName,
     link: "/noi-bo/quan-ly/yeu-cau-doi-lich",
   })
+  void broadcastNotificationsUpdate()
 
   return { ok: true, data: { id: data.id } }
 }
@@ -244,5 +252,7 @@ export async function reviewRegistrationChangeAction(input: unknown): Promise<Ac
   revalidatePath("/noi-bo/quan-ly/yeu-cau-doi-lich")
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
+  refresh()
+  void broadcastNotificationsUpdate()
   return { ok: true, data: null }
 }

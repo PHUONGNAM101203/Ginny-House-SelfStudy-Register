@@ -4,6 +4,7 @@ import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { computeOccupancy, findMissingRegistrations, computeFrequencyRanking } from "@/lib/dashboard"
 import { sendPushToRole } from "@/lib/push/send"
+import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
 import { OccupancyChart } from "@/components/dashboard/OccupancyChart"
 import { MissingRegistrationsList } from "@/components/dashboard/MissingRegistrationsList"
 import { TrendChart } from "@/components/dashboard/TrendChart"
@@ -97,9 +98,13 @@ export default async function DashboardPage() {
 
   // Mirror each missing student into the persisted notification log, deduped
   // by student+week so revisiting the dashboard mid-week doesn't spam
-  // duplicates — history stays even after the student later registers.
+  // duplicates. Unlike the original design (kept history even after a
+  // student registered), the notification is now auto-removed once it's
+  // resolved — a stale "chưa đăng ký" notice for someone who already booked
+  // is exactly the case the "auto xoá khi hành động đã thực hiện" ask
+  // described.
+  const mondayStr = format(monday, "yyyy-MM-dd")
   if (missing.length > 0) {
-    const mondayStr = format(monday, "yyyy-MM-dd")
     // Best-effort: a failed sync (e.g. a transient network blip) shouldn't
     // break the dashboard render — the notification is a convenience mirror
     // of data this panel already displays directly.
@@ -128,7 +133,23 @@ export default async function DashboardPage() {
         body: `${newlyMissing.length} học sinh chưa đăng ký tuần này`,
         link: "/noi-bo/dashboard",
       })
+      void broadcastNotificationsUpdate()
     }
+  }
+
+  // A student who WAS missing earlier this week but has since registered no
+  // longer needs their notice. Fetch this week's still-pending rows and
+  // delete-by-id (rather than building a raw SQL `NOT IN (...)` filter
+  // string) for whichever ones aren't in the current `missing` set anymore.
+  const stillMissingKeys = new Set(missing.map((m) => `missing:${m.studentId}:${mondayStr}`))
+  const { data: weekNotifications } = await supabase
+    .from("notifications")
+    .select("id, dedupe_key")
+    .like("dedupe_key", `missing:%:${mondayStr}`)
+  const resolvedIds = (weekNotifications ?? []).filter((n) => !stillMissingKeys.has(n.dedupe_key!)).map((n) => n.id)
+  if (resolvedIds.length > 0) {
+    await supabase.from("notifications").delete().in("id", resolvedIds)
+    void broadcastNotificationsUpdate()
   }
 
   const ranking = computeFrequencyRanking(
