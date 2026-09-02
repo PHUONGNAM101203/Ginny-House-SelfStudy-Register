@@ -39,7 +39,7 @@ export default async function StudentsPage() {
     { data: allRegistrations },
     { data: allRecurring },
   ] = await Promise.all([
-    supabase.from("students").select("id, full_name, phone, created_at").order("full_name"),
+    supabase.from("students").select("id, full_name, phone, created_at, active").order("full_name"),
     supabase
       .from("recurring_registrations")
       .select("id, student_name, class_name, day_of_week, start_time, end_time, branches(name), desks(label)")

@@ -19,17 +19,18 @@ export function SyncLarkButton() {
     setSyncing(false)
     if (!result.ok) return toast.error(result.error)
 
-    const { upserted, skipped } = result.data
+    const { upserted, archived, skipped } = result.data
+    const archivedNote = archived > 0 ? ` · ${archived} chuyển sang ngừng hoạt động` : ""
     // Skipped rows are a data problem in the base itself (blank phone,
     // duplicate number) that only someone looking at Lark can fix, so they
     // get surfaced rather than swallowed into a bare success.
     if (skipped.length > 0) {
-      toast.warning(`Đã đồng bộ ${upserted} học sinh · bỏ qua ${skipped.length} dòng`, {
+      toast.warning(`Đã đồng bộ ${upserted} học sinh${archivedNote} · bỏ qua ${skipped.length} dòng`, {
         description: skipped.slice(0, 3).map((s) => s.reason).join(" · "),
       })
       return
     }
-    toast.success(`Đã đồng bộ ${upserted} học sinh từ Lark`)
+    toast.success(`Đã đồng bộ ${upserted} học sinh từ Lark${archivedNote}`)
   }
 
   return (

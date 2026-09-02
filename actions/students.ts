@@ -103,6 +103,23 @@ export async function updateStudentAction(input: unknown): Promise<ActionResult<
  * consent instead of a block: the confirm dialog states exactly how many
  * bookings will go, and the caller decides.
  */
+/**
+ * Archiving, the normal way to take someone off the roster — deleting
+ * cascades their booking history away, this keeps it. An archived student
+ * stops appearing in the booking autocomplete (search_students, migration
+ * 0023), so they can't be booked back in by accident.
+ */
+export async function setStudentActiveAction(studentId: string, active: boolean): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const supabase = await createServerClient()
+  const { error } = await supabase.from("students").update({ active }).eq("id", studentId)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  refresh()
+  return { ok: true, data: null }
+}
+
 export async function deleteStudentAction(studentId: string): Promise<ActionResult<null>> {
   await requireAdmin()
   const supabase = await createServerClient()

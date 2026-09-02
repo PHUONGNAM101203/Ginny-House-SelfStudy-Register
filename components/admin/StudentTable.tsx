@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { PencilIcon, SearchIcon } from "lucide-react"
-import { updateStudentAction, deleteStudentAction } from "@/actions/students"
+import { PencilIcon, SearchIcon, ArchiveIcon, ArchiveRestoreIcon } from "lucide-react"
+import { updateStudentAction, deleteStudentAction, setStudentActiveAction } from "@/actions/students"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import { DialogForm } from "@/components/ui/dialog-form"
 import { ResponsiveList } from "@/components/admin/ResponsiveList"
 import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
 import { matchesAllTerms } from "@/lib/vn-text"
+import { cn } from "@/lib/utils"
 
 /** class_name is a "most recent known class" read from that student's registrations, not a stored attribute of the student. */
 type Student = {
@@ -23,6 +24,38 @@ type Student = {
   class_name: string | null
   /** Registrations + recurring rules that the delete cascade would remove. */
   booking_count: number
+  /** False = ngừng hoạt động: kept for history, but no longer bookable. */
+  active: boolean
+}
+
+/**
+ * Archiving is the normal way off the roster; the hard delete beside it
+ * exists for genuine mistakes only, which is why this dialog spells out the
+ * history it destroys.
+ */
+function ArchiveToggle({ student }: { student: Student }) {
+  const [pending, setPending] = useState(false)
+
+  async function toggle() {
+    setPending(true)
+    const result = await setStudentActiveAction(student.id, !student.active)
+    setPending(false)
+    if (!result.ok) return toast.error(result.error)
+    toast.success(student.active ? "Đã cho ngừng hoạt động" : "Đã kích hoạt lại")
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      disabled={pending}
+      aria-label={student.active ? "Ngừng hoạt động" : "Kích hoạt lại"}
+      title={student.active ? "Ngừng hoạt động (giữ lịch sử)" : "Kích hoạt lại"}
+      onClick={toggle}
+    >
+      {student.active ? <ArchiveIcon className="size-4" /> : <ArchiveRestoreIcon className="size-4" />}
+    </Button>
+  )
 }
 
 /**
@@ -31,9 +64,10 @@ type Student = {
  * deleteStudentAction for why the old blanket block had to go.
  */
 function deleteDescription(student: Student): string {
+  const tail = "Nếu chỉ muốn cho học sinh ngừng học, hãy dùng nút Ngừng hoạt động để giữ lại lịch sử."
   return student.booking_count > 0
-    ? `Xoá luôn ${student.booking_count} lịch đăng ký của học sinh này (kể cả lịch đã huỷ và lịch cố định). Không khôi phục lại được.`
-    : "Học sinh này chưa có lịch đăng ký nào. Không khôi phục lại được."
+    ? `Xoá luôn ${student.booking_count} lịch đăng ký của học sinh này (kể cả lịch đã huỷ và lịch cố định). Không khôi phục lại được. ${tail}`
+    : `Học sinh này chưa có lịch đăng ký nào. Không khôi phục lại được. ${tail}`
 }
 
 function EditStudentDialog({ student }: { student: Student }) {
@@ -87,17 +121,21 @@ const PAGE_SIZE = 50
 export function StudentTable({ students }: { students: Student[] }) {
   const [query, setQuery] = useState("")
   const [page, setPage] = useState(0)
+  const [showArchived, setShowArchived] = useState(false)
 
   // Filtering client-side: the page already has every student in hand, and
   // the list is in the hundreds, not the millions. Name, lớp and SĐT all go
   // into one haystack so "0946" and "bich ngoc" both work, accent- and
   // case-insensitively (lib/vn-text.ts).
   const filtered = useMemo(() => {
-    if (!query.trim()) return students
-    return students.filter((s) =>
+    const base = showArchived ? students : students.filter((s) => s.active)
+    if (!query.trim()) return base
+    return base.filter((s) =>
       matchesAllTerms(`${s.full_name} ${s.class_name ?? ""} ${s.phone}`, query)
     )
-  }, [students, query])
+  }, [students, query, showArchived])
+
+  const archivedCount = students.filter((s) => !s.active).length
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   // Narrowing the search can leave `page` past the end of the new result set,
@@ -120,11 +158,26 @@ export function StudentTable({ students }: { students: Student[] }) {
         />
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {query.trim()
-          ? `${filtered.length} kết quả trong ${students.length} học sinh`
-          : `${students.length} học sinh`}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xs text-muted-foreground">
+          {query.trim()
+            ? `${filtered.length} kết quả trong ${students.length} học sinh`
+            : `${students.length - archivedCount} đang hoạt động${archivedCount > 0 ? ` · ${archivedCount} ngừng hoạt động` : ""}`}
+        </p>
+        {archivedCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => {
+              setShowArchived((v) => !v)
+              setPage(0)
+            }}
+          >
+            {showArchived ? "Ẩn học sinh ngừng hoạt động" : `Hiện ${archivedCount} học sinh ngừng hoạt động`}
+          </Button>
+        )}
+      </div>
 
     <ResponsiveList
       items={visible}
@@ -138,14 +191,22 @@ export function StudentTable({ students }: { students: Student[] }) {
           </TableHeader>
           <TableBody>
             {visible.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>{s.full_name}</TableCell>
+              <TableRow key={s.id} className={s.active ? undefined : "opacity-60"}>
+                <TableCell>
+                  {s.full_name}
+                  {!s.active && (
+                    <span className="ml-2 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      Ngừng hoạt động
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell>{s.class_name ?? "—"}</TableCell>
                 <TableCell>{s.phone}</TableCell>
                 <TableCell>{new Date(s.created_at).toLocaleDateString("vi-VN")}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <EditStudentDialog student={s} />
+                    <ArchiveToggle student={s} />
                     <DeleteConfirmButton
                       title={`Xoá học sinh ${s.full_name}?`}
                       description={deleteDescription(s)}
@@ -159,14 +220,18 @@ export function StudentTable({ students }: { students: Student[] }) {
         </Table>
       }
       card={(s) => (
-        <div key={s.id} className="flex items-start justify-between gap-2 rounded-lg border border-border p-3">
+        <div key={s.id} className={cn("flex items-start justify-between gap-2 rounded-lg border border-border p-3", !s.active && "opacity-60")}>
           <div className="min-w-0">
-            <p className="truncate font-medium">{s.full_name}</p>
+            <p className="truncate font-medium">
+              {s.full_name}
+              {!s.active && <span className="ml-2 text-[10px] text-muted-foreground">(ngừng hoạt động)</span>}
+            </p>
             {s.class_name && <p className="truncate text-xs text-muted-foreground">{s.class_name}</p>}
             <p className="truncate text-xs text-muted-foreground">{s.phone}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <EditStudentDialog student={s} />
+            <ArchiveToggle student={s} />
             <DeleteConfirmButton
               title={`Xoá học sinh ${s.full_name}?`}
               description={deleteDescription(s)}
