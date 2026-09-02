@@ -3,7 +3,6 @@
 import { requireProfile } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { subscribeToPushSchema, unsubscribeFromPushSchema } from "@/lib/validations/push"
-import { sendTestPush, type PushDiagnostic } from "@/lib/push/send"
 import type { ActionResult } from "@/types"
 
 export async function subscribeToPushAction(input: unknown): Promise<ActionResult<null>> {
@@ -38,17 +37,3 @@ export async function unsubscribeFromPushAction(input: unknown): Promise<ActionR
   return { ok: true, data: null }
 }
 
-/**
- * "Gửi thử" from the notification bell: pushes to the caller's own device and
- * reports what the push service said. See sendTestPush for why the real
- * status code matters here rather than a silent failure.
- */
-export async function sendTestPushAction(endpoint: string): Promise<ActionResult<PushDiagnostic>> {
-  await requireProfile()
-  const result = await sendTestPush(endpoint)
-  if (!result.ok) {
-    const detail = [result.statusCode ? `mã ${result.statusCode}` : null, result.message].filter(Boolean).join(" · ")
-    return { ok: false, error: `Không gửi được tới ${result.endpointHost}${detail ? ` (${detail})` : ""}` }
-  }
-  return { ok: true, data: result }
-}

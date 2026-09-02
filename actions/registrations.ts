@@ -4,6 +4,7 @@ import { revalidatePath, refresh } from "next/cache"
 import { after } from "next/server"
 import { createPublicClient } from "@/lib/supabase/public"
 import { sendPushToRole } from "@/lib/push/send"
+import { formatBookingSummary } from "@/lib/booking-summary"
 import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
 import {
   createRegistrationSchema,
@@ -78,17 +79,37 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
   // the app. target_role null matches the notification row: every internal
   // role, quản sinh included.
   after(async () => {
+    // Same sentence the bell shows, including cơ sở and chỗ — a push that
+    // says less than the notification it announces just sends you hunting.
+    const place = await getBookingPlace(parsed.data.deskId)
     await sendPushToRole(null, {
-      title: "Đăng ký lịch mới",
-      body:
-        parsed.data.fullName +
-        (parsed.data.className ? ` · ${parsed.data.className}` : "") +
-        ` — ${parsed.data.date} ${parsed.data.startTime}-${parsed.data.endTime}`,
+      title: parsed.data.isRecurring ? "Học sinh xin lịch cố định" : "Học sinh đăng ký lịch mới",
+      body: formatBookingSummary({
+        fullName: parsed.data.fullName,
+        className: parsed.data.className,
+        date: parsed.data.date,
+        startTime: parsed.data.startTime,
+        endTime: parsed.data.endTime,
+        ...place,
+      }),
       link: "/noi-bo/lich",
     })
     await broadcastNotificationsUpdate()
   })
   return { ok: true, data: { id: data.id } }
+}
+
+/** Cơ sở + chỗ for a notification body; both null if the desk has vanished. */
+async function getBookingPlace(deskId: string): Promise<{ branchName: string | null; deskLabel: string | null }> {
+  const supabase = createPublicClient()
+  const { data } = await supabase
+    .from("desks")
+    .select("label, branches(name)")
+    .eq("id", deskId)
+    .maybeSingle()
+  const branches = data?.branches as { name: string } | { name: string }[] | null | undefined
+  const branchName = Array.isArray(branches) ? (branches[0]?.name ?? null) : (branches?.name ?? null)
+  return { branchName, deskLabel: data?.label ?? null }
 }
 
 export async function cancelRegistrationAction(input: unknown): Promise<ActionResult<null>> {
@@ -114,7 +135,7 @@ export async function cancelRegistrationAction(input: unknown): Promise<ActionRe
   // people without anyone having to relay it by hand.
   after(async () => {
     await sendPushToRole(null, {
-      title: "Guest huỷ lịch",
+      title: "Học sinh huỷ lịch",
       body: parsed.data.fullName,
       link: "/noi-bo/lich",
     })
@@ -157,6 +178,27 @@ export async function createRegistrationAsAdminAction(input: unknown): Promise<A
 
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
+  after(async () => {
+    // A quản sinh booking on someone's behalf is news to the admin; an
+    // admin's own booking is not — they just made it. Mirrors what
+    // create_registration decides for the bell row (migration 0032).
+    const profile = await requireProfile()
+    if (profile.role !== "quan_sinh") return
+    const place = await getBookingPlace(parsed.data.deskId)
+    await sendPushToRole("admin", {
+      title: "Quản sinh đăng ký cho học sinh",
+      body: formatBookingSummary({
+        fullName: parsed.data.fullName,
+        className: parsed.data.className,
+        date: parsed.data.date,
+        startTime: parsed.data.startTime,
+        endTime: parsed.data.endTime,
+        ...place,
+      }),
+      link: "/noi-bo/lich",
+    })
+    await broadcastNotificationsUpdate()
+  })
   return { ok: true, data: { id: data.id } }
 }
 

@@ -8,7 +8,7 @@ import { BellIcon, BellRingIcon, BellOffIcon, XIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
 import { markNotificationsReadAction, deleteNotificationAction, deleteAllNotificationsAction } from "@/actions/notifications"
-import { subscribeToPushAction, unsubscribeFromPushAction, sendTestPushAction } from "@/actions/push"
+import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push"
 import { subscribeToNotifications } from "@/lib/notification-realtime"
 import { Button } from "@/components/ui/button"
 import {
@@ -94,34 +94,6 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
   }
 
   const [clearing, setClearing] = useState(false)
-  const [testing, setTesting] = useState(false)
-
-  /**
-   * "Gửi thử" — the only reliable way to tell an expired subscription from a
-   * muted OS from a site iOS won't push to. Sends to this device and shows
-   * whatever the push service replied.
-   */
-  async function sendTestPush() {
-    setTesting(true)
-    try {
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription()
-      if (!subscription) {
-        toast.error("Thiết bị này chưa bật thông báo đẩy")
-        return
-      }
-      const result = await sendTestPushAction(subscription.endpoint)
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
-      toast.success("Đã gửi. Nếu không thấy thông báo hiện lên, hệ điều hành đang chặn.")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không gửi thử được")
-    } finally {
-      setTesting(false)
-    }
-  }
 
   async function clearAll() {
     const ids = items.map((i) => i.id)
@@ -287,19 +259,6 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
               {pushState === "subscribed" ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
               {pushState === "subscribed" ? "Đã bật thông báo đẩy trên thiết bị này" : "Bật thông báo đẩy trên thiết bị này"}
             </DropdownMenuItem>
-            {pushState === "subscribed" && (
-              <DropdownMenuItem
-                disabled={testing}
-                onSelect={(e) => {
-                  e.preventDefault()
-                  void sendTestPush()
-                }}
-                className="gap-2 text-muted-foreground"
-              >
-                <BellRingIcon className="size-4" />
-                {testing ? "Đang gửi thử..." : "Gửi thử một thông báo tới thiết bị này"}
-              </DropdownMenuItem>
-            )}
           </>
         )}
       </DropdownMenuContent>
