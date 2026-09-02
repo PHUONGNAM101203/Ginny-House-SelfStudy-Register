@@ -58,11 +58,10 @@ export function ScheduleGridClient({
         <CancelDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
-          registrationId={selected.registration.id}
           deskLabel={selected.desk.label}
           startTime={selected.startTime}
           endTime={selected.endTime}
-          onSuccess={() => router.refresh()}
+          isRecurring={selected.registration.recurringRegistrationId !== null}
           onRequestChangeInstead={() => setRequestingChange(true)}
         />
       )}

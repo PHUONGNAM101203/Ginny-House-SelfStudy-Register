@@ -8,7 +8,7 @@ import { BellIcon, BellRingIcon, BellOffIcon, XIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
 import { markNotificationsReadAction, deleteNotificationAction, deleteAllNotificationsAction } from "@/actions/notifications"
-import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push"
+import { subscribeToPushAction, unsubscribeFromPushAction, sendTestPushAction } from "@/actions/push"
 import { subscribeToNotifications } from "@/lib/notification-realtime"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,7 +42,11 @@ type PushSupport = "checking" | "unsupported" | "subscribed" | "unsubscribed"
 export function NotificationBell({ initialUnreadCount, items: initialItems }: { initialUnreadCount: number; items: NotificationItem[] }) {
   const router = useRouter()
   const [items, setItems] = useState(initialItems)
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
+  // Derived, not a second piece of state: a separate counter drifted away
+  // from the list — the badge kept showing 1 after the last notification had
+  // been deleted. The server computes it the same way (see
+  // lib/notifications/summary.ts), so there is nothing to keep in sync.
+  const unreadCount = items.filter((i) => !i.read).length
   const [, startTransition] = useTransition()
   const [pushState, setPushState] = useState<PushSupport>("checking")
 
@@ -52,8 +56,7 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
   // (the "read prop once at mount" footgun this codebase has hit before).
   useEffect(() => {
     setItems(initialItems)
-    setUnreadCount(initialUnreadCount)
-  }, [initialItems, initialUnreadCount])
+  }, [initialItems])
 
   useEffect(() => {
     return subscribeToNotifications(() => router.refresh())
@@ -79,7 +82,6 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
   function markOneRead(item: NotificationItem) {
     if (item.read) return
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, read: true } : i)))
-    setUnreadCount((c) => Math.max(0, c - 1))
     startTransition(() => {
       markNotificationsReadAction([item.id])
     })
@@ -87,12 +89,39 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
 
   async function deleteItem(item: NotificationItem) {
     setItems((prev) => prev.filter((i) => i.id !== item.id))
-    if (!item.read) setUnreadCount((c) => Math.max(0, c - 1))
     const result = await deleteNotificationAction(item.id)
     if (!result.ok) toast.error(result.error)
   }
 
   const [clearing, setClearing] = useState(false)
+  const [testing, setTesting] = useState(false)
+
+  /**
+   * "Gửi thử" — the only reliable way to tell an expired subscription from a
+   * muted OS from a site iOS won't push to. Sends to this device and shows
+   * whatever the push service replied.
+   */
+  async function sendTestPush() {
+    setTesting(true)
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        toast.error("Thiết bị này chưa bật thông báo đẩy")
+        return
+      }
+      const result = await sendTestPushAction(subscription.endpoint)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success("Đã gửi. Nếu không thấy thông báo hiện lên, hệ điều hành đang chặn.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không gửi thử được")
+    } finally {
+      setTesting(false)
+    }
+  }
 
   async function clearAll() {
     const ids = items.map((i) => i.id)
@@ -100,15 +129,12 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
     // Optimistic, same as deleteItem: the list empties immediately and the
     // failure path puts it back rather than leaving a lie on screen.
     const previous = items
-    const previousUnread = unreadCount
     setItems([])
-    setUnreadCount(0)
     setClearing(true)
     const result = await deleteAllNotificationsAction(ids)
     setClearing(false)
     if (!result.ok) {
       setItems(previous)
-      setUnreadCount(previousUnread)
       toast.error(result.error)
       return
     }
@@ -261,6 +287,19 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
               {pushState === "subscribed" ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
               {pushState === "subscribed" ? "Đã bật thông báo đẩy trên thiết bị này" : "Bật thông báo đẩy trên thiết bị này"}
             </DropdownMenuItem>
+            {pushState === "subscribed" && (
+              <DropdownMenuItem
+                disabled={testing}
+                onSelect={(e) => {
+                  e.preventDefault()
+                  void sendTestPush()
+                }}
+                className="gap-2 text-muted-foreground"
+              >
+                <BellRingIcon className="size-4" />
+                {testing ? "Đang gửi thử..." : "Gửi thử một thông báo tới thiết bị này"}
+              </DropdownMenuItem>
+            )}
           </>
         )}
       </DropdownMenuContent>

@@ -43,7 +43,10 @@ describe("create_registration", () => {
 })
 
 describe("cancel_registration", () => {
-  it("cancels when name+phone match", async () => {
+  // Since migration 0031 a guest cannot cancel at all — every huỷ goes
+  // through admin review. The name/phone tests these replace asserted the
+  // old self-cancel, which no longer exists in any form.
+  it("refuses a guest cancellation with GH001, even with the right name and phone", async () => {
     const { data: reg } = await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-26", p_start_time: "10:00", p_end_time: "10:30",
       p_full_name: "Trần Thị B", p_phone: "0900000004", p_is_recurring: false, p_admin_created: false,
@@ -51,21 +54,29 @@ describe("cancel_registration", () => {
     const { error } = await supabase.rpc("cancel_registration", {
       p_registration_id: reg.id, p_full_name: "Trần Thị B", p_phone: "0900000004",
     })
-    expect(error).toBeNull()
+    expect(error).not.toBeNull()
+    // The UI keys on this code to steer the guest into the phiếu flow, so it
+    // is part of the contract rather than an arbitrary failure.
+    expect(error?.code).toBe("GH001")
   })
 
-  it("rejects when phone does not match", async () => {
+  it("leaves the booking active when a guest tries to cancel it", async () => {
     const { data: reg } = await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-27", p_start_time: "11:00", p_end_time: "11:30",
       p_full_name: "Lê Văn C", p_phone: "0900000005", p_is_recurring: false, p_admin_created: false,
     })
-    const { error } = await supabase.rpc("cancel_registration", {
-      p_registration_id: reg.id, p_full_name: "Lê Văn C", p_phone: "0900000099",
+    await supabase.rpc("cancel_registration", {
+      p_registration_id: reg.id, p_full_name: "Lê Văn C", p_phone: "0900000005",
     })
-    expect(error).not.toBeNull()
+    const { data: after } = await supabase
+      .from("registrations")
+      .select("status")
+      .eq("id", reg.id)
+      .single()
+    expect(after?.status).toBe("active")
   })
 
-  it("rejects when name does not match", async () => {
+  it("refuses a guest cancellation on a wrong name or phone too", async () => {
     const { data: reg } = await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-30", p_start_time: "15:00", p_end_time: "15:30",
       p_full_name: "Đỗ Văn F", p_phone: "0900000009", p_is_recurring: false, p_admin_created: false,
@@ -74,31 +85,6 @@ describe("cancel_registration", () => {
       p_registration_id: reg.id, p_full_name: "Wrong Name", p_phone: "0900000009",
     })
     expect(error).not.toBeNull()
-  })
-
-  it("cancels using the name from booking time, even after a later booking on the same phone changes the student's name", async () => {
-    const phone = "0900000008"
-
-    // R1 booked as "A".
-    const { data: reg1 } = await supabase.rpc("create_registration", {
-      p_desk_id: deskId, p_date: "2026-08-28", p_start_time: "14:00", p_end_time: "14:30",
-      p_full_name: "A", p_phone: phone, p_is_recurring: false, p_admin_created: false,
-    })
-
-    // Same phone rebooked as "B" — mutates students.full_name to "B" via the
-    // create_registration upsert (on conflict (phone) do update set full_name = excluded.full_name).
-    await supabase.rpc("create_registration", {
-      p_desk_id: deskId, p_date: "2026-08-29", p_start_time: "14:00", p_end_time: "14:30",
-      p_full_name: "B", p_phone: phone, p_is_recurring: false, p_admin_created: false,
-    })
-
-    // Cancelling R1 with the name actually used to book it ("A") must still
-    // succeed — cancel_registration must compare against the registration's
-    // own student_name snapshot, not the now-mutated live students.full_name.
-    const { error } = await supabase.rpc("cancel_registration", {
-      p_registration_id: reg1.id, p_full_name: "A", p_phone: phone,
-    })
-    expect(error).toBeNull()
   })
 
   describe("admin bypass", () => {
