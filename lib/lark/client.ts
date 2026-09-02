@@ -12,10 +12,14 @@ async function larkFetch<T>(url: string, init: RequestInit): Promise<T> {
   // Lark answers 200 with a non-zero `code` for auth and permission errors,
   // so response.ok alone never catches a wrong app secret or a base the app
   // hasn't been added to.
-  if (body.code !== 0 || !body.data) {
+  if (body.code !== 0) {
     throw new Error(`Lark API error ${body.code}: ${body.msg}`)
   }
-  return body.data
+  // Two response shapes: most endpoints nest the payload under `data`, but
+  // the tenant_access_token endpoint puts `tenant_access_token`/`expire` at
+  // the top level next to code/msg. Requiring `data` rejected a perfectly
+  // good token response as "Lark API error 0: ok".
+  return (body.data ?? (body as unknown as T)) as T
 }
 
 export async function getTenantAccessToken(config: LarkConfig): Promise<string> {

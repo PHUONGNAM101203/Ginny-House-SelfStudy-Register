@@ -6,6 +6,8 @@ import { mapLarkRecords } from "@/lib/lark/map"
 export type LarkSyncResult = {
   fetched: number
   upserted: number
+  /** Rows the status allowlist excluded — leads, alumni, students who left. */
+  filteredOut: number
   skipped: { recordId: string; reason: string }[]
 }
 
@@ -31,10 +33,14 @@ export async function syncStudentsFromLark(): Promise<LarkSyncResult> {
 
   const token = await getTenantAccessToken(config)
   const records = await listBitableRecords(config, token)
-  const { students, skipped } = mapLarkRecords(records, config.fieldNames)
+  const { students, skipped, filteredOut } = mapLarkRecords(
+    records,
+    config.fieldNames,
+    config.statusAllowlist
+  )
 
   if (students.length === 0) {
-    return { fetched: records.length, upserted: 0, skipped }
+    return { fetched: records.length, upserted: 0, filteredOut, skipped }
   }
 
   const supabase = createAdminClient()
@@ -44,5 +50,5 @@ export async function syncStudentsFromLark(): Promise<LarkSyncResult> {
   )
   if (error) throw new Error(`Không ghi được vào students: ${error.message}`)
 
-  return { fetched: records.length, upserted: students.length, skipped }
+  return { fetched: records.length, upserted: students.length, filteredOut, skipped }
 }

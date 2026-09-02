@@ -4,7 +4,12 @@ export type LarkConfig = {
   appSecret: string
   appToken: string
   tableId: string
-  fieldNames: { fullName: string; phone: string }
+  fieldNames: { fullName: string; phone: string; status: string }
+  /**
+   * Which values of the status column count as "a student this app cares
+   * about". Empty = no filtering (every row syncs).
+   */
+  statusAllowlist: string[]
 }
 
 /**
@@ -29,9 +34,18 @@ export function readLarkConfig(): LarkConfig | null {
     appToken,
     tableId,
     fieldNames: {
-      fullName: process.env.LARK_FIELD_FULL_NAME ?? "Họ và tên",
+      fullName: process.env.LARK_FIELD_FULL_NAME ?? "Họ và tên học sinh",
       phone: process.env.LARK_FIELD_PHONE ?? "Số điện thoại",
+      status: process.env.LARK_FIELD_STATUS ?? "Trạng thái học sinh",
     },
+    // The Base is the centre's whole CRM — leads who never enrolled, students
+    // who finished, students who quit — so an unfiltered sync would fill the
+    // self-study register with people who can't book anything. Comma-separated
+    // so the office can widen or narrow it without a deploy.
+    statusAllowlist: (process.env.LARK_STATUS_ALLOWLIST ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean),
   }
 }
 

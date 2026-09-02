@@ -21,6 +21,7 @@ export type MappedStudent = {
 export type LarkFieldNames = {
   fullName: string
   phone: string
+  status: string
 }
 
 function segmentText(value: unknown): string {
@@ -67,13 +68,25 @@ export function normalizePhone(raw: string): string {
  */
 export function mapLarkRecords(
   records: LarkRecord[],
-  fields: LarkFieldNames
-): { students: MappedStudent[]; skipped: { recordId: string; reason: string }[] } {
+  fields: LarkFieldNames,
+  statusAllowlist: string[] = []
+): { students: MappedStudent[]; skipped: { recordId: string; reason: string }[]; filteredOut: number } {
   const students: MappedStudent[] = []
   const skipped: { recordId: string; reason: string }[] = []
   const seenPhones = new Set<string>()
+  let filteredOut = 0
 
   for (const record of records) {
+    // Rows outside the allowlist are counted, not reported one by one — with
+    // a CRM of a thousand leads the "skipped" list would be all noise.
+    if (statusAllowlist.length > 0) {
+      const status = larkFieldToText(record.fields[fields.status])
+      if (!statusAllowlist.includes(status)) {
+        filteredOut += 1
+        continue
+      }
+    }
+
     const fullName = larkFieldToText(record.fields[fields.fullName])
     const phone = normalizePhone(larkFieldToText(record.fields[fields.phone]))
 
@@ -95,5 +108,5 @@ export function mapLarkRecords(
     students.push({ fullName, phone, larkRecordId: record.record_id })
   }
 
-  return { students, skipped }
+  return { students, skipped, filteredOut }
 }

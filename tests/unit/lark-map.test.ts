@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { larkFieldToText, normalizePhone, mapLarkRecords, type LarkRecord } from "@/lib/lark/map"
 import { parseLarkBaseUrl } from "@/lib/lark/config"
 
-const fields = { fullName: "Họ và tên", phone: "Số điện thoại" }
+const fields = { fullName: "Họ và tên", phone: "Số điện thoại", status: "Trạng thái học sinh" }
 
 describe("larkFieldToText", () => {
   it("reads a plain text cell", () => {
@@ -45,9 +45,9 @@ describe("normalizePhone", () => {
 })
 
 describe("mapLarkRecords", () => {
-  const record = (id: string, name: unknown, phone: unknown): LarkRecord => ({
+  const record = (id: string, name: unknown, phone: unknown, status?: string): LarkRecord => ({
     record_id: id,
-    fields: { "Họ và tên": name, "Số điện thoại": phone },
+    fields: { "Họ và tên": name, "Số điện thoại": phone, "Trạng thái học sinh": status ?? "" },
   })
 
   it("maps a clean row through", () => {
@@ -80,7 +80,47 @@ describe("mapLarkRecords", () => {
   })
 
   it("handles an empty base without throwing", () => {
-    expect(mapLarkRecords([], fields)).toEqual({ students: [], skipped: [] })
+    expect(mapLarkRecords([], fields)).toEqual({ students: [], skipped: [], filteredOut: 0 })
+  })
+})
+
+describe("mapLarkRecords with a status allowlist", () => {
+  const record = (id: string, name: string, phone: string, status: string): LarkRecord => ({
+    record_id: id,
+    fields: { "Họ và tên": name, "Số điện thoại": phone, "Trạng thái học sinh": status },
+  })
+
+  // The Base is the centre's whole CRM: leads who never enrolled, alumni, and
+  // students who left all sit in the same table as the ones actually studying.
+  const rows = [
+    record("rec1", "Đang Học A", "0900000001", "Đang học"),
+    record("rec2", "Cho Lop B", "0900000002", "Đang chờ lớp"),
+    record("rec3", "Xong C", "0900000003", "Đã học xong"),
+    record("rec4", "Nghi D", "0900000004", "Đã nghỉ"),
+    record("rec5", "Lead E", "0900000005", ""),
+  ]
+
+  it("keeps only the allowed statuses and counts the rest", () => {
+    const { students, filteredOut } = mapLarkRecords(rows, fields, ["Đang học", "Đang chờ lớp"])
+    expect(students.map((s) => s.larkRecordId)).toEqual(["rec1", "rec2"])
+    expect(filteredOut).toBe(3)
+  })
+
+  it("counts excluded rows rather than listing them as skipped", () => {
+    // A thousand-lead CRM would otherwise drown the skipped list in noise.
+    const { skipped } = mapLarkRecords(rows, fields, ["Đang học"])
+    expect(skipped).toEqual([])
+  })
+
+  it("syncs everything when the allowlist is empty", () => {
+    const { students, filteredOut } = mapLarkRecords(rows, fields, [])
+    expect(students).toHaveLength(5)
+    expect(filteredOut).toBe(0)
+  })
+
+  it("excludes a blank status, which is what a pure lead looks like", () => {
+    const { students } = mapLarkRecords(rows, fields, ["Đang học"])
+    expect(students.map((s) => s.fullName)).toEqual(["Đang Học A"])
   })
 })
 
