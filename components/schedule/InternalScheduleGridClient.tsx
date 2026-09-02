@@ -57,7 +57,6 @@ export function InternalScheduleGridClient({
           studentName={selected.registration.studentName}
           className={selected.registration.className}
           recurringRegistrationId={selected.registration.recurringRegistrationId}
-          recurringApproved={selected.registration.recurringApproved}
           startTime={selected.startTime}
           endTime={selected.endTime}
           onSuccess={() => router.refresh()}

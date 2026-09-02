@@ -34,18 +34,6 @@ export default async function InternalCalendarPage({
   // noise, and the slot reads as free to them, which it is.
   const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday, { internal: true }) : null
 
-  // "Lịch chờ duyệt" is an admin concern: only they can act on it, and a
-  // quản sinh's own recurring schedules never need approving anyway. For
-  // everyone else the row reads as the single booking it currently is.
-  const registrations =
-    schedule && profile.role !== "admin"
-      ? schedule.registrations.map((r) =>
-          r.recurringApproved === false
-            ? { ...r, recurringRegistrationId: null, recurringApproved: null }
-            : r
-        )
-      : (schedule?.registrations ?? [])
-
   // Phone numbers are staff-only — fetched here with the authenticated
   // client (passes students' RLS is_staff() check), never through
   // getScheduleData's anon client (which the guest-facing page also uses;
@@ -71,7 +59,7 @@ export default async function InternalCalendarPage({
         (view === "week" ? (
           <WeekOverview
             desks={schedule.desks}
-            registrations={registrations}
+            registrations={schedule.registrations}
             locks={schedule.locks}
             weekDates={getWeekDates(monday).map(toYmd)}
             branchId={activeBranchId}
@@ -79,7 +67,7 @@ export default async function InternalCalendarPage({
           />
         ) : (
           <InternalScheduleGridClient
-            desks={schedule.desks} date={selectedDate} registrations={registrations} locks={schedule.locks}
+            desks={schedule.desks} date={selectedDate} registrations={schedule.registrations} locks={schedule.locks}
             canBook
             canCancel={profile.role === "admin"}
             phoneByStudentId={phoneByStudentId}

@@ -138,55 +138,15 @@ describe("cancel_registration", () => {
 })
 
 describe("materialize_recurring_registrations", () => {
-  // A guest's lịch cố định is a request until an admin approves it
-  // (migration 0029), so it must not quietly hold a desk for future weeks in
-  // the meantime — that would make the approval meaningless.
-  it("skips a recurring rule that is still waiting for approval", async () => {
+  it("creates one registration per active recurring rule for the given week", async () => {
+    // Recurring schedules apply immediately again — migration 0033 removed
+    // the approval step that briefly gated this.
     await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-31", p_start_time: "12:00", p_end_time: "12:30",
       p_full_name: "Phạm D", p_phone: "0900000006", p_is_recurring: true, p_admin_created: false,
     })
     const { data: count, error } = await supabase.rpc("materialize_recurring_registrations", {
       p_week_start: "2026-09-07",
-    })
-    expect(error).toBeNull()
-    expect(count).toBe(0)
-  })
-
-  it("materialises the rule once it has been approved", async () => {
-    const { data: reg } = await supabase.rpc("create_registration", {
-      p_desk_id: deskId, p_date: "2026-08-31", p_start_time: "15:00", p_end_time: "15:30",
-      p_full_name: "Phạm E", p_phone: "0900000016", p_is_recurring: true, p_admin_created: false,
-    })
-
-    // Its own admin: the one in the "admin bypass" block is scoped to that
-    // describe, and review_recurring_registration is is_admin()-gated.
-    const email = `approver-${Date.now()}@example.com`
-    const password = "test-password-123!"
-    const service = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "")
-    const { data: created, error: createError } = await service.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    })
-    expect(createError).toBeNull()
-    const { error: profileError } = await service
-      .from("profiles")
-      .insert({ id: created!.user!.id, full_name: "Approver Test", role: "admin" })
-    expect(profileError).toBeNull()
-
-    const admin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    const { error: signInError } = await admin.auth.signInWithPassword({ email, password })
-    expect(signInError).toBeNull()
-
-    const { error: reviewError } = await admin.rpc("review_recurring_registration", {
-      p_id: reg.recurring_registration_id,
-      p_approve: true,
-    })
-    expect(reviewError).toBeNull()
-
-    const { data: count, error } = await supabase.rpc("materialize_recurring_registrations", {
-      p_week_start: "2026-09-14",
     })
     expect(error).toBeNull()
     expect(count).toBeGreaterThanOrEqual(1)

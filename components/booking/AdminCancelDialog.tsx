@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { cancelRegistrationAsAdminAction, reviewRecurringRegistrationAction } from "@/actions/registrations"
+import { cancelRegistrationAsAdminAction } from "@/actions/registrations"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -23,7 +23,6 @@ export function AdminCancelDialog({
   startTime,
   endTime,
   recurringRegistrationId,
-  recurringApproved,
   onSuccess,
 }: {
   open: boolean
@@ -35,27 +34,9 @@ export function AdminCancelDialog({
   startTime: string
   endTime: string
   recurringRegistrationId: string | null
-  /** False = a guest's lịch cố định request still waiting on an admin. */
-  recurringApproved?: boolean | null
   onSuccess: () => void
 }) {
   const [submitting, setSubmitting] = useState(false)
-  const [reviewing, setReviewing] = useState(false)
-  const isPending = !!recurringRegistrationId && recurringApproved === false
-
-  async function review(approve: boolean) {
-    if (!recurringRegistrationId) return
-    setReviewing(true)
-    const result = await reviewRecurringRegistrationAction(recurringRegistrationId, approve)
-    setReviewing(false)
-    if (!result.ok) {
-      toast.error(result.error)
-      return
-    }
-    toast.success(approve ? "Đã duyệt lịch cố định" : "Đã từ chối lịch cố định")
-    onOpenChange(false)
-    onSuccess()
-  }
 
   async function handleCancel() {
     setSubmitting(true)
@@ -79,22 +60,10 @@ export function AdminCancelDialog({
             {studentName}
             {className ? ` · Lớp ${className}` : ""}
             <br />
-            {isPending ? "Lịch cố định · đang chờ duyệt" : recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
+            {recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          {/* Approving is the common action on a pending request, so it leads
-              and the destructive cancel sits apart from it. */}
-          {isPending && (
-            <>
-              <Button type="button" disabled={reviewing} onClick={() => review(true)}>
-                {reviewing ? "Đang xử lý..." : "Duyệt lịch cố định"}
-              </Button>
-              <Button type="button" variant="outline" disabled={reviewing} onClick={() => review(false)}>
-                Từ chối
-              </Button>
-            </>
-          )}
           <Button type="button" variant="destructive" disabled={submitting} onClick={handleCancel}>
             {submitting ? "Đang huỷ..." : "Xác nhận huỷ"}
           </Button>

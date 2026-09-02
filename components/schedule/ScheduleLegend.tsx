@@ -1,6 +1,6 @@
 import { BOOKING_KIND_LABEL, BOOKING_KIND_STYLE, type BookingKind } from "@/lib/booking-kind"
 
-const ORDER: BookingKind[] = ["normal", "recurring", "pending", "cancelled"]
+const ORDER: BookingKind[] = ["normal", "recurring", "cancelled"]
 
 /**
  * Three tinted chips can only be read at a glance once you know what the

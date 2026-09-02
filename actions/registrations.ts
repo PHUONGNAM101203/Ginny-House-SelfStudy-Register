@@ -83,7 +83,7 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
     // says less than the notification it announces just sends you hunting.
     const place = await getBookingPlace(parsed.data.deskId)
     await sendPushToRole(null, {
-      title: parsed.data.isRecurring ? "Học sinh xin lịch cố định" : "Học sinh đăng ký lịch mới",
+      title: parsed.data.isRecurring ? "Học sinh đăng ký lịch cố định" : "Học sinh đăng ký lịch mới",
       body: formatBookingSummary({
         fullName: parsed.data.fullName,
         className: parsed.data.className,
@@ -334,40 +334,3 @@ export async function reviewRegistrationChangeAction(input: unknown): Promise<Ac
   return { ok: true, data: null }
 }
 
-/**
- * Approve or reject a guest's request for a lịch cố định (migration 0029).
- *
- * Approving materialises this week and next on the spot rather than waiting
- * for someone's next calendar load, so the admin sees the result of their own
- * click. Rejecting deactivates the rule and leaves the single booking the
- * guest already made for that week alone — they asked for a repeat, not for
- * that day to be undone.
- */
-export async function reviewRecurringRegistrationAction(
-  recurringRegistrationId: string,
-  approve: boolean
-): Promise<ActionResult<null>> {
-  await requireAdmin()
-  const supabase = await createServerClient()
-  const { error } = await supabase.rpc("review_recurring_registration", {
-    p_id: recurringRegistrationId,
-    p_approve: approve,
-  })
-  if (error) return { ok: false, error: error.message }
-
-  revalidatePath("/noi-bo/lich")
-  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
-  revalidatePath("/")
-  refresh()
-  after(async () => {
-    if (approve) {
-      await sendPushToRole(null, {
-        title: "Đã duyệt lịch cố định",
-        body: "Lịch cố định đã được duyệt và áp dụng cho các tuần tới",
-        link: "/noi-bo/quan-ly/hoc-sinh",
-      })
-    }
-    await broadcastNotificationsUpdate()
-  })
-  return { ok: true, data: null }
-}
