@@ -19,6 +19,7 @@ type Registration = {
   recurringRegistrationId: string | null
   /** Cancelled bookings reach this component on internal pages only. */
   status?: "active" | "cancelled"
+  recurringApproved?: boolean | null
 }
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 

@@ -13,7 +13,7 @@ import {
   reviewChangeRequestSchema,
 } from "@/lib/validations/registration"
 import type { ActionResult } from "@/types"
-import { requireAdmin } from "@/lib/auth"
+import { requireAdmin, requireProfile } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 
 export type StudentLookupResult = { fullName: string; phone: string; className: string | null }
@@ -123,8 +123,14 @@ export async function cancelRegistrationAction(input: unknown): Promise<ActionRe
   return { ok: true, data: null }
 }
 
+/**
+ * Booking placed from inside the app. Quản sinh đặt hộ học sinh trong lớp,
+ * so this is staff-wide rather than admin-only — the database agrees
+ * (create_registration checks is_staff(), migration 0030). Cancelling stays
+ * admin-only, in both the UI and cancel_registration itself.
+ */
 export async function createRegistrationAsAdminAction(input: unknown): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  await requireProfile()
   const parsed = createRegistrationSchema.safeParse(input)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
@@ -283,5 +289,43 @@ export async function reviewRegistrationChangeAction(input: unknown): Promise<Ac
   revalidatePath("/")
   refresh()
   after(() => broadcastNotificationsUpdate())
+  return { ok: true, data: null }
+}
+
+/**
+ * Approve or reject a guest's request for a lịch cố định (migration 0029).
+ *
+ * Approving materialises this week and next on the spot rather than waiting
+ * for someone's next calendar load, so the admin sees the result of their own
+ * click. Rejecting deactivates the rule and leaves the single booking the
+ * guest already made for that week alone — they asked for a repeat, not for
+ * that day to be undone.
+ */
+export async function reviewRecurringRegistrationAction(
+  recurringRegistrationId: string,
+  approve: boolean
+): Promise<ActionResult<null>> {
+  await requireAdmin()
+  const supabase = await createServerClient()
+  const { error } = await supabase.rpc("review_recurring_registration", {
+    p_id: recurringRegistrationId,
+    p_approve: approve,
+  })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  revalidatePath("/")
+  refresh()
+  after(async () => {
+    if (approve) {
+      await sendPushToRole(null, {
+        title: "Đã duyệt lịch cố định",
+        body: "Lịch cố định đã được duyệt và áp dụng cho các tuần tới",
+        link: "/noi-bo/quan-ly/hoc-sinh",
+      })
+    }
+    await broadcastNotificationsUpdate()
+  })
   return { ok: true, data: null }
 }

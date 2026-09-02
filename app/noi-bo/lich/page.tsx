@@ -32,7 +32,7 @@ export default async function InternalCalendarPage({
   // and admin can see who dropped out, per Gin Anh. The guest page keeps
   // fetching active rows only — a guest seeing someone else's cancellation is
   // noise, and the slot reads as free to them, which it is.
-  const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday, { includeCancelled: true }) : null
+  const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday, { internal: true }) : null
 
   // Phone numbers are staff-only — fetched here with the authenticated
   // client (passes students' RLS is_staff() check), never through
@@ -68,7 +68,8 @@ export default async function InternalCalendarPage({
         ) : (
           <InternalScheduleGridClient
             desks={schedule.desks} date={selectedDate} registrations={schedule.registrations} locks={schedule.locks}
-            canBook={profile.role === "admin"}
+            canBook
+            canCancel={profile.role === "admin"}
             phoneByStudentId={phoneByStudentId}
           />
         ))}

@@ -1,4 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public"
+import { createServerClient } from "@/lib/supabase/server"
 import { getMondayOfWeek, getWeekDates } from "@/lib/week"
 import { sortDesks } from "@/lib/desks"
 import { sortBranchesDefaultFirst } from "@/lib/branches"
@@ -29,13 +30,26 @@ export type RegistrationRow = {
    * dropped out without anyone having to message them about it.
    */
   status: "active" | "cancelled"
+  /**
+   * Null when the booking isn't tied to a recurring rule. False = the guest
+   * asked for a lịch cố định and an admin hasn't approved it yet (migration
+   * 0029), which the calendar draws as its own "chờ duyệt" kind.
+   */
+  recurringApproved: boolean | null
 }
 export type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
 export async function getScheduleData(
   branchId: string,
   weekMonday: Date,
-  { includeCancelled = false }: { includeCancelled?: boolean } = {}
+  /**
+   * The internal calendar sees two things the guest page must not: cancelled
+   * bookings, and whether a lịch cố định has been approved. The second needs
+   * an authenticated client — recurring_registrations is is_staff() only, so
+   * the anon client reads zero rows and every pending rule silently looked
+   * approved.
+   */
+  { internal = false }: { internal?: boolean } = {}
 ) {
   const supabase = createPublicClient()
   const dates = getWeekDates(weekMonday)
@@ -50,7 +64,7 @@ export async function getScheduleData(
       .from("registrations")
       .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name, recurring_registration_id, status")
       .eq("branch_id", branchId)
-      .in("status", includeCancelled ? ["active", "cancelled"] : ["active"])
+      .in("status", internal ? ["active", "cancelled"] : ["active"])
       .gte("date", from)
       .lte("date", to)
       // .limit(10000) matches supabase/config.toml's raised `max_rows`: explicit and intentional
@@ -59,6 +73,17 @@ export async function getScheduleData(
       .limit(10000),
     supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("branch_id", branchId).eq("active", true),
   ])
+
+  // Approval state lives on the rule, not on the materialised row.
+  const approvedByRuleId = new Map<string, boolean>()
+  if (internal) {
+    const staffClient = await createServerClient()
+    const { data: rules } = await staffClient
+      .from("recurring_registrations")
+      .select("id, approved")
+      .eq("branch_id", branchId)
+    for (const rule of rules ?? []) approvedByRuleId.set(rule.id, rule.approved)
+  }
 
   const rows = (registrations ?? []).map((r) => ({
     id: r.id,
@@ -71,6 +96,9 @@ export async function getScheduleData(
     className: r.class_name,
     recurringRegistrationId: r.recurring_registration_id,
     status: r.status,
+    recurringApproved: r.recurring_registration_id
+      ? (approvedByRuleId.get(r.recurring_registration_id) ?? null)
+      : null,
   })) as RegistrationRow[]
 
   // A cancelled slot that someone else has since taken is no longer news —

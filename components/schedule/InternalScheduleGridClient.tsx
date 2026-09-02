@@ -9,13 +9,16 @@ import { createRegistrationAsAdminAction } from "@/actions/registrations"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 
 export function InternalScheduleGridClient({
-  desks, date, registrations, locks, canBook, phoneByStudentId,
+  desks, date, registrations, locks, canBook, canCancel, phoneByStudentId,
 }: {
   desks: Desk[]
   date: string
   registrations: RegistrationRow[]
   locks: SlotLock[]
+  /** Quản sinh đặt hộ học sinh — staff-wide. */
   canBook: boolean
+  /** Cancelling stays admin-only; a huỷ has to be an admin decision. */
+  canCancel: boolean
   phoneByStudentId?: Map<string, string>
 }) {
   const router = useRouter()
@@ -45,7 +48,7 @@ export function InternalScheduleGridClient({
           booking as admin was a dead click (see actions/registrations.ts's
           cancelRegistrationAsAdminAction for why the RPC already supported
           this and only the UI was missing). */}
-      {canBook && selected?.registration && (
+      {canCancel && selected?.registration && (
         <AdminCancelDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
@@ -54,6 +57,7 @@ export function InternalScheduleGridClient({
           studentName={selected.registration.studentName}
           className={selected.registration.className}
           recurringRegistrationId={selected.registration.recurringRegistrationId}
+          recurringApproved={selected.registration.recurringApproved}
           startTime={selected.startTime}
           endTime={selected.endTime}
           onSuccess={() => router.refresh()}
