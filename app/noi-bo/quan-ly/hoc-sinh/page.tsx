@@ -4,6 +4,7 @@ import { StudentTable } from "@/components/admin/StudentTable"
 import { RecurringRegistrationTable, type RecurringRow } from "@/components/admin/RecurringRegistrationTable"
 import { CreateStudentDialog } from "@/components/admin/CreateStudentDialog"
 import { ImportLarkDialog } from "@/components/admin/ImportLarkDialog"
+import { SyncLarkButton } from "@/components/admin/SyncLarkButton"
 import { CreateRecurringScheduleDialog } from "@/components/admin/CreateRecurringScheduleDialog"
 import { sortDesks } from "@/lib/desks"
 import { sortBranchesDefaultFirst } from "@/lib/branches"
@@ -75,6 +76,7 @@ export default async function StudentsPage() {
           <div className="flex flex-wrap gap-2">
             <CreateStudentDialog />
             <ImportLarkDialog />
+            <SyncLarkButton />
           </div>
         </div>
         <StudentTable
