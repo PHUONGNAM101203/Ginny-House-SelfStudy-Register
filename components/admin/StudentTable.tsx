@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DialogForm } from "@/components/ui/dialog-form"
 import { ResponsiveList } from "@/components/admin/ResponsiveList"
 import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
 
@@ -40,19 +41,21 @@ function EditStudentDialog({ student }: { student: Student }) {
           <DialogHeader>
             <DialogTitle>Sửa học sinh</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-student-name">Họ tên</Label>
-              <Input id="edit-student-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-student-name">Họ tên</Label>
+                <Input id="edit-student-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-student-phone">Số điện thoại</Label>
+                <Input id="edit-student-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-student-phone">Số điện thoại</Label>
-              <Input id="edit-student-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>

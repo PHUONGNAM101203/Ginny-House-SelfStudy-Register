@@ -6,6 +6,7 @@ import { UploadIcon } from "lucide-react"
 import { importStudentsFromLarkAction } from "@/actions/students"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DialogForm } from "@/components/ui/dialog-form"
 
 // Same CSV shape scripts/import-lark.ts's CLI reads: header
 // "lark_record_id,full_name,phone", plain comma-split (no quoted-field
@@ -66,31 +67,33 @@ export function ImportLarkDialog() {
           <DialogHeader>
             <DialogTitle>Nhập học sinh từ Lark Base</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              Chọn file CSV xuất từ Lark Base (cột: lark_record_id, full_name, phone).
-            </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="text-sm"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleFile(file)
-              }}
-            />
-            {fileName && (
-              <p className="text-sm">
-                {fileName} — tìm thấy <span className="font-medium">{rows.length}</span> dòng.
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Chọn file CSV xuất từ Lark Base (cột: lark_record_id, full_name, phone).
               </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting || rows.length === 0}>
-              {submitting ? "Đang nhập..." : `Nhập ${rows.length > 0 ? rows.length : ""} học sinh`}
-            </Button>
-          </DialogFooter>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="text-sm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFile(file)
+                }}
+              />
+              {fileName && (
+                <p className="text-sm">
+                  {fileName} — tìm thấy <span className="font-medium">{rows.length}</span> dòng.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting || rows.length === 0}>
+                {submitting ? "Đang nhập..." : `Nhập ${rows.length > 0 ? rows.length : ""} học sinh`}
+              </Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>

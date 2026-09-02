@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DialogForm } from "@/components/ui/dialog-form"
 
 export function CreateStudentDialog() {
   const [open, setOpen] = useState(false)
@@ -35,19 +36,21 @@ export function CreateStudentDialog() {
           <DialogHeader>
             <DialogTitle>Thêm học sinh</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="student-name">Họ tên</Label>
-              <Input id="student-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="student-name">Họ tên</Label>
+                <Input id="student-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="student-phone">Số điện thoại</Label>
+                <Input id="student-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="student-phone">Số điện thoại</Label>
-              <Input id="student-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>

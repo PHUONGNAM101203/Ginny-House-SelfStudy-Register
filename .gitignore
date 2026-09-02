@@ -32,3 +32,6 @@ playwright-report/
 blob-report/
 playwright/.cache/
 .env*
+
+# Claude Code local state + feature worktrees (never part of the app)
+.claude/

@@ -85,7 +85,14 @@ export function ChatThread({
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          // isComposing guards the Vietnamese IME: Telex/VNI use Enter to
+          // accept a composition, which would otherwise fire the message off
+          // mid-word.
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing) return
+            e.preventDefault()
+            void handleSend()
+          }}
           placeholder={disabled ? (disabledReason ?? "Không thể gửi") : "Nhập tin nhắn..."}
           disabled={disabled || sending}
         />

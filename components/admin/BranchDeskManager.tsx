@@ -11,7 +11,10 @@ import { Label } from "@/components/ui/label"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DialogForm } from "@/components/ui/dialog-form"
 import { ResponsiveList } from "@/components/admin/ResponsiveList"
+import { PagedCardGrid } from "@/components/admin/PagedCardGrid"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
 
 type Branch = { id: string; code: string; name: string }
@@ -43,19 +46,21 @@ function CreateBranchDialog() {
           <DialogHeader>
             <DialogTitle>Thêm cơ sở</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="branch-code">Mã (vd: hoang-gia)</Label>
-              <Input id="branch-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="branch-code">Mã (vd: hoang-gia)</Label>
+                <Input id="branch-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="branch-name">Tên cơ sở</Label>
+                <Input id="branch-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="branch-name">Tên cơ sở</Label>
-              <Input id="branch-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>
@@ -86,15 +91,17 @@ function EditBranchDialog({ branch }: { branch: Branch }) {
           <DialogHeader>
             <DialogTitle>Sửa cơ sở</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-branch-name">Tên cơ sở</Label>
-              <Input id="edit-branch-name" value={name} onChange={(e) => setName(e.target.value)} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-branch-name">Tên cơ sở</Label>
+                <Input id="edit-branch-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>
@@ -127,21 +134,23 @@ function CreateDeskDialog({ branches }: { branches: Branch[] }) {
           <DialogHeader>
             <DialogTitle>Thêm chỗ ngồi</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="desk-branch">Cơ sở</Label>
-              <NativeSelect id="desk-branch" value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </NativeSelect>
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="desk-branch">Cơ sở</Label>
+                <NativeSelect id="desk-branch" value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </NativeSelect>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="desk-label">Tên chỗ (vd: Chỗ 11)</Label>
+                <Input id="desk-label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="desk-label">Tên chỗ (vd: Chỗ 11)</Label>
-              <Input id="desk-label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang thêm..." : "Thêm"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>
@@ -172,15 +181,17 @@ function EditDeskDialog({ desk }: { desk: Desk }) {
           <DialogHeader>
             <DialogTitle>Sửa chỗ ngồi</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-desk-label">Tên chỗ</Label>
-              <Input id="edit-desk-label" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-desk-label">Tên chỗ</Label>
+                <Input id="edit-desk-label" value={label} onChange={(e) => setLabel(e.target.value)} />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>
@@ -193,7 +204,8 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
     if (!result.ok) toast.error(result.error)
   }
 
-  const branchNameById = new Map(branches.map((b) => [b.id, b.name]))
+  const desksByBranch = new Map<string, Desk[]>(branches.map((b) => [b.id, []]))
+  for (const desk of desks) desksByBranch.get(desk.branch_id)?.push(desk)
 
   return (
     <div className="flex flex-col gap-8">
@@ -236,61 +248,52 @@ export function BranchDeskManager({ branches, desks }: { branches: Branch[]; des
           <h2 className="font-medium">Chỗ ngồi</h2>
           <CreateDeskDialog branches={branches} />
         </div>
-        <ResponsiveList
-          items={desks}
-          emptyMessage="Chưa có chỗ ngồi nào."
-          table={
-            <Table>
-              <TableHeader>
-                <TableRow><TableHead>Cơ sở</TableHead><TableHead>Chỗ</TableHead><TableHead>Trạng thái</TableHead><TableHead /></TableRow>
-              </TableHeader>
-              <TableBody>
-                {desks.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{branchNameById.get(d.branch_id)}</TableCell>
-                    <TableCell>{d.label}</TableCell>
-                    <TableCell>
+        {branches.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Chưa có cơ sở nào.</p>
+        ) : (
+          // One flat table listing every desk at every cơ sở scrolled far off
+          // the bottom of the page once both cơ sở had their full 10 chỗ.
+          // Tabbing by cơ sở keeps only one cơ sở's desks on screen, and the
+          // "Cơ sở" column disappears with it — it was the same value on
+          // every visible row anyway.
+          <Tabs defaultValue={branches[0].id}>
+            <TabsList className="w-full">
+              {branches.map((b) => (
+                <TabsTrigger key={b.id} value={b.id}>
+                  {b.name}
+                  <span className="text-xs text-muted-foreground">({desksByBranch.get(b.id)?.length ?? 0})</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {branches.map((b) => (
+              <TabsContent key={b.id} value={b.id} className="mt-4">
+                <PagedCardGrid
+                  items={desksByBranch.get(b.id) ?? []}
+                  resetKey={b.id}
+                  emptyMessage="Cơ sở này chưa có chỗ ngồi nào."
+                  card={(d) => (
+                    <div key={d.id} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 truncate font-medium">{d.label}</p>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <EditDeskDialog desk={d} />
+                          <DeleteConfirmButton
+                            title={`Xoá ${d.label}?`}
+                            description="Chỗ chưa có lịch sử đăng ký nào mới xoá được — nếu đã có, hãy tắt chỗ thay vì xoá."
+                            onConfirm={() => deleteDeskAction(d.id)}
+                          />
+                        </div>
+                      </div>
                       <Button size="sm" variant={d.active ? "outline" : "secondary"} onClick={() => toggleDesk(d.id, !d.active)}>
                         {d.active ? "Đang mở — tắt" : "Đã tắt — bật lại"}
                       </Button>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <EditDeskDialog desk={d} />
-                        <DeleteConfirmButton
-                          title={`Xoá ${d.label}?`}
-                          description="Chỗ chưa có lịch sử đăng ký nào mới xoá được — nếu đã có, hãy tắt chỗ thay vì xoá."
-                          onConfirm={() => deleteDeskAction(d.id)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          }
-          card={(d) => (
-            <div key={d.id} className="flex flex-col gap-2 rounded-lg border border-border p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{d.label}</p>
-                  <p className="truncate text-xs text-muted-foreground">{branchNameById.get(d.branch_id)}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <EditDeskDialog desk={d} />
-                  <DeleteConfirmButton
-                    title={`Xoá ${d.label}?`}
-                    description="Chỗ chưa có lịch sử đăng ký nào mới xoá được — nếu đã có, hãy tắt chỗ thay vì xoá."
-                    onConfirm={() => deleteDeskAction(d.id)}
-                  />
-                </div>
-              </div>
-              <Button size="sm" variant={d.active ? "outline" : "secondary"} onClick={() => toggleDesk(d.id, !d.active)}>
-                {d.active ? "Đang mở — tắt" : "Đã tắt — bật lại"}
-              </Button>
-            </div>
-          )}
-        />
+                    </div>
+                  )}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
       </section>
     </div>
   )

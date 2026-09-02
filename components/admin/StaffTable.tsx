@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DialogForm } from "@/components/ui/dialog-form"
 import { ResponsiveList } from "@/components/admin/ResponsiveList"
 import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
 
@@ -40,22 +41,24 @@ function EditStaffDialog({ staff }: { staff: Staff }) {
           <DialogHeader>
             <DialogTitle>Sửa nhân sự</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-staff-name">Họ tên</Label>
-              <Input id="edit-staff-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <DialogForm onSubmit={submit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-staff-name">Họ tên</Label>
+                <Input id="edit-staff-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-staff-role">Vai trò</Label>
+                <NativeSelect id="edit-staff-role" value={role} onChange={(e) => setRole(e.target.value as "admin" | "quan_sinh")}>
+                  <option value="quan_sinh">Quản sinh</option>
+                  <option value="admin">Admin</option>
+                </NativeSelect>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-staff-role">Vai trò</Label>
-              <NativeSelect id="edit-staff-role" value={role} onChange={(e) => setRole(e.target.value as "admin" | "quan_sinh")}>
-                <option value="quan_sinh">Quản sinh</option>
-                <option value="admin">Admin</option>
-              </NativeSelect>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={submit} disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu"}</Button>
+            </DialogFooter>
+          </DialogForm>
         </DialogContent>
       </Dialog>
     </>

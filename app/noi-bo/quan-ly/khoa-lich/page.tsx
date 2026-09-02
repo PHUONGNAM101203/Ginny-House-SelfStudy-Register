@@ -14,12 +14,13 @@ export default async function SlotLockPage() {
     supabase.from("desks").select("id, branch_id, label"),
     supabase
       .from("slot_locks")
-      .select("id, day_of_week, start_time, end_time, reason, branches(name), desks(label)")
+      .select("id, branch_id, day_of_week, start_time, end_time, reason, branches(name), desks(label)")
       .eq("active", true),
   ])
 
   type LockRow = {
     id: string
+    branch_id: string
     day_of_week: number
     start_time: string
     end_time: string
@@ -29,7 +30,7 @@ export default async function SlotLockPage() {
   }
 
   const rows = ((locks ?? []) as unknown as LockRow[]).map((l) => ({
-    id: l.id, branch_name: l.branches?.name ?? "", desk_label: l.desks?.label ?? null,
+    id: l.id, branch_id: l.branch_id, branch_name: l.branches?.name ?? "", desk_label: l.desks?.label ?? null,
     day_of_week: l.day_of_week, start_time: l.start_time, end_time: l.end_time, reason: l.reason,
   }))
 
@@ -39,7 +40,7 @@ export default async function SlotLockPage() {
       {/* SlotLockForm already narrows this list to the selected branch, so a
           plain desk-number sort is enough here. */}
       <SlotLockForm branches={sortBranchesDefaultFirst(branches ?? [])} desks={sortDesks(desks ?? [])} />
-      <SlotLockTable locks={rows} />
+      <SlotLockTable locks={rows} branches={sortBranchesDefaultFirst(branches ?? [])} />
     </div>
   )
 }
