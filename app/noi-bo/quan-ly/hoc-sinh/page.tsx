@@ -39,7 +39,7 @@ export default async function StudentsPage() {
     { data: allRegistrations },
     { data: allRecurring },
   ] = await Promise.all([
-    supabase.from("students").select("id, full_name, phone, created_at, active").order("full_name"),
+    supabase.from("students").select("id, full_name, phone, created_at, active, class_name").order("full_name"),
     supabase
       .from("recurring_registrations")
       .select("id, student_name, class_name, day_of_week, start_time, end_time, branches(name), desks(label)")
@@ -101,7 +101,9 @@ export default async function StudentsPage() {
         <StudentTable
           students={(students ?? []).map((s) => ({
             ...s,
-            class_name: latestClassByStudentId.get(s.id) ?? null,
+            // The student's own lớp wins; the derived "most recent booking"
+            // read is only a fallback for students who predate the column.
+            class_name: s.class_name ?? latestClassByStudentId.get(s.id) ?? null,
             booking_count: bookingCountByStudentId.get(s.id) ?? 0,
           }))}
         />

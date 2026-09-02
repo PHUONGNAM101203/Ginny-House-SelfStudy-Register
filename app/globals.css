@@ -518,7 +518,18 @@
    affordance. Enforcement of the click-reject happens in ScheduleGrid's
    onSelectSlot handler; this class is visual only. */
 .schedule-grid-calendar .rbc-slot-locked {
-  background-color: var(--muted);
+  /* A flat muted fill read as "slightly different white" next to the normal
+     grid — Gin Anh: người dùng vẫn tưởng ô đó đặt được. Diagonal hatching is
+     the one pattern nobody mistakes for an empty cell, and it survives both
+     themes and a dimmed screen where a tint difference does not. */
+  background-color: color-mix(in oklch, var(--muted-foreground) 8%, var(--card));
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    color-mix(in oklch, var(--muted-foreground) 28%, transparent) 5px,
+    color-mix(in oklch, var(--muted-foreground) 28%, transparent) 7px
+  );
   cursor: not-allowed;
 }
 /* The stock stylesheet hardcodes light-mode backgrounds in a few places
@@ -550,3 +561,17 @@
   color: var(--popover-foreground);
 }
 
+
+/* Shared by the week overview's "Không có chỗ" cells and, via
+   .rbc-slot-locked above, the day grid — one definition so the two views
+   cannot drift into meaning the same thing with different looks. */
+.schedule-locked-hatch {
+  background-color: color-mix(in oklch, var(--muted-foreground) 8%, var(--card));
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    color-mix(in oklch, var(--muted-foreground) 28%, transparent) 5px,
+    color-mix(in oklch, var(--muted-foreground) 28%, transparent) 7px
+  );
+}

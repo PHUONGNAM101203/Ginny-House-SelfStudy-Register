@@ -75,10 +75,11 @@ function EditStudentDialog({ student }: { student: Student }) {
   const [submitting, setSubmitting] = useState(false)
   const [fullName, setFullName] = useState(student.full_name)
   const [phone, setPhone] = useState(student.phone)
+  const [className, setClassName] = useState(student.class_name ?? "")
 
   async function submit() {
     setSubmitting(true)
-    const result = await updateStudentAction({ id: student.id, fullName, phone })
+    const result = await updateStudentAction({ id: student.id, fullName, phone, className })
     setSubmitting(false)
     if (!result.ok) return toast.error(result.error)
     toast.success("Đã cập nhật học sinh")
@@ -104,6 +105,15 @@ function EditStudentDialog({ student }: { student: Student }) {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-student-phone">Số điện thoại</Label>
                 <Input id="edit-student-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-student-class">Lớp</Label>
+                <Input
+                  id="edit-student-class"
+                  value={className}
+                  placeholder="VD: L2-04-26"
+                  onChange={(e) => setClassName(e.target.value)}
+                />
               </div>
             </div>
             <DialogFooter>

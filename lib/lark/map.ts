@@ -15,6 +15,7 @@ export type LarkRecord = {
 export type MappedStudent = {
   fullName: string
   phone: string
+  className: string | null
   larkRecordId: string
 }
 
@@ -22,6 +23,13 @@ export type LarkFieldNames = {
   fullName: string
   phone: string
   status: string
+  /**
+   * Ordered: the Base keeps a student's class in whichever of these columns
+   * applies to them right now — 158 of 195 active students have "Lớp GH
+   * đã/đang học", the rest are in a trial or waiting class. First non-empty
+   * wins.
+   */
+  classFields: string[]
 }
 
 function segmentText(value: unknown): string {
@@ -89,6 +97,8 @@ export function mapLarkRecords(
 
     const fullName = larkFieldToText(record.fields[fields.fullName])
     const phone = normalizePhone(larkFieldToText(record.fields[fields.phone]))
+    const className =
+      fields.classFields.map((f) => larkFieldToText(record.fields[f])).find((v) => v) ?? null
 
     if (!fullName) {
       skipped.push({ recordId: record.record_id, reason: "thiếu họ tên" })
@@ -105,7 +115,7 @@ export function mapLarkRecords(
       continue
     }
     seenPhones.add(phone)
-    students.push({ fullName, phone, larkRecordId: record.record_id })
+    students.push({ fullName, phone, className, larkRecordId: record.record_id })
   }
 
   return { students, skipped, filteredOut }

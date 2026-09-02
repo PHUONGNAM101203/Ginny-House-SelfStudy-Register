@@ -10,6 +10,7 @@ import { MissingRegistrationsList } from "@/components/dashboard/MissingRegistra
 import { TrendChart } from "@/components/dashboard/TrendChart"
 import { FrequencyRanking } from "@/components/dashboard/FrequencyRanking"
 import { format, subWeeks } from "date-fns"
+import { after } from "next/server"
 
 // Postgres `time` columns serialize over PostgREST as "HH:MM:SS" (or with fractional
 // seconds). lib/dashboard.ts's computeOccupancy compares lock times against
@@ -128,12 +129,14 @@ export default async function DashboardPage() {
     // comes back through .select() here — this only fires for genuinely new
     // misses, one summary push per run rather than one per student.
     if (newlyMissing && newlyMissing.length > 0) {
-      void sendPushToRole(null, {
-        title: "Học sinh chưa đăng ký tuần này",
-        body: `${newlyMissing.length} học sinh chưa đăng ký tuần này`,
-        link: "/noi-bo/dashboard",
+      after(async () => {
+        await sendPushToRole(null, {
+          title: "Học sinh chưa đăng ký tuần này",
+          body: `${newlyMissing.length} học sinh chưa đăng ký tuần này`,
+          link: "/noi-bo/dashboard",
+        })
+        await broadcastNotificationsUpdate()
       })
-      void broadcastNotificationsUpdate()
     }
   }
 
@@ -149,7 +152,7 @@ export default async function DashboardPage() {
   const resolvedIds = (weekNotifications ?? []).filter((n) => !stillMissingKeys.has(n.dedupe_key!)).map((n) => n.id)
   if (resolvedIds.length > 0) {
     await supabase.from("notifications").delete().in("id", resolvedIds)
-    void broadcastNotificationsUpdate()
+    after(() => broadcastNotificationsUpdate())
   }
 
   const ranking = computeFrequencyRanking(

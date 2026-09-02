@@ -4,7 +4,7 @@ export type LarkConfig = {
   appSecret: string
   appToken: string
   tableId: string
-  fieldNames: { fullName: string; phone: string; status: string }
+  fieldNames: { fullName: string; phone: string; status: string; classFields: string[] }
   /**
    * Which values of the status column count as "a student this app cares
    * about". Empty = no filtering (every row syncs).
@@ -37,6 +37,10 @@ export function readLarkConfig(): LarkConfig | null {
       fullName: process.env.LARK_FIELD_FULL_NAME ?? "Họ và tên học sinh",
       phone: process.env.LARK_FIELD_PHONE ?? "Số điện thoại",
       status: process.env.LARK_FIELD_STATUS ?? "Trạng thái học sinh",
+      classFields: (process.env.LARK_FIELD_CLASS ?? "Lớp GH đã/đang học,Lớp học thử,Lớp đang chờ ?")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean),
     },
     // The Base is the centre's whole CRM — leads who never enrolled, students
     // who finished, students who quit — so an unfiltered sync would fill the

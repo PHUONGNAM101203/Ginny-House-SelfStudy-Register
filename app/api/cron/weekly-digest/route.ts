@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { addDays } from "date-fns"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { buildWeeklyDigest, type WeeklyDigestStats } from "@/lib/weekly-digest"
+import { sendPushToRole } from "@/lib/push/send"
 import { getMondayOfWeek } from "@/lib/week"
 import { parseYmd, toYmd, vietnamToday } from "@/lib/vn-date"
 
@@ -86,6 +87,10 @@ export async function GET(request: Request) {
     console.error("weekly digest failed:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // The digest is the one notification nobody is sitting in the app waiting
+  // for — 22:00 on a Sunday is exactly when it needs to reach a phone.
+  await sendPushToRole(null, { title: digest.title, body: digest.body, link: "/noi-bo/dashboard" })
 
   return NextResponse.json({ ok: true, week: `${from}..${to}`, ...stats })
 }

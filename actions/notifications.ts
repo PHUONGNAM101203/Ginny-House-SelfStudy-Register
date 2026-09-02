@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
 import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
 import type { ActionResult } from "@/types"
+import { after } from "next/server"
 
 export async function markNotificationsReadAction(notificationIds: string[]): Promise<ActionResult<null>> {
   const profile = await requireProfile()
@@ -31,6 +32,26 @@ export async function deleteNotificationAction(notificationId: string): Promise<
   if (error) return { ok: false, error: error.message }
 
   revalidatePath("/noi-bo", "layout")
-  void broadcastNotificationsUpdate()
+  after(() => broadcastNotificationsUpdate())
   return { ok: true, data: null }
+}
+
+/**
+ * "Xoá tất cả" — same shared-feed semantics as deleting one: the rows go for
+ * every staff member, not just the caller. Deleting by id rather than an
+ * unfiltered `.delete()`, because PostgREST rejects a delete with no filter
+ * and because passing the ids the caller could actually see keeps this from
+ * quietly wiping a row that arrived a second ago and nobody has read yet.
+ */
+export async function deleteAllNotificationsAction(notificationIds: string[]): Promise<ActionResult<{ count: number }>> {
+  await requireProfile()
+  if (notificationIds.length === 0) return { ok: true, data: { count: 0 } }
+
+  const supabase = await createServerClient()
+  const { error } = await supabase.from("notifications").delete().in("id", notificationIds)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo", "layout")
+  after(() => broadcastNotificationsUpdate())
+  return { ok: true, data: { count: notificationIds.length } }
 }

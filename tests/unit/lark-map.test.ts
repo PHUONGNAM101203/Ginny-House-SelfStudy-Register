@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest"
 import { larkFieldToText, normalizePhone, mapLarkRecords, type LarkRecord } from "@/lib/lark/map"
 import { parseLarkBaseUrl } from "@/lib/lark/config"
 
-const fields = { fullName: "Họ và tên", phone: "Số điện thoại", status: "Trạng thái học sinh" }
+const fields = {
+  fullName: "Họ và tên",
+  phone: "Số điện thoại",
+  status: "Trạng thái học sinh",
+  classFields: ["Lớp chính", "Lớp học thử"],
+}
 
 describe("larkFieldToText", () => {
   it("reads a plain text cell", () => {
@@ -53,7 +58,9 @@ describe("mapLarkRecords", () => {
   it("maps a clean row through", () => {
     const { students, skipped } = mapLarkRecords([record("rec1", "Nguyễn Văn A", "0912 345 678")], fields)
     expect(skipped).toEqual([])
-    expect(students).toEqual([{ fullName: "Nguyễn Văn A", phone: "0912345678", larkRecordId: "rec1" }])
+    expect(students).toEqual([
+      { fullName: "Nguyễn Văn A", phone: "0912345678", className: null, larkRecordId: "rec1" },
+    ])
   })
 
   it("skips a row with no name instead of importing a nameless student", () => {
@@ -77,6 +84,34 @@ describe("mapLarkRecords", () => {
     expect(students[0].larkRecordId).toBe("rec1")
     expect(skipped[0]).toMatchObject({ recordId: "rec2" })
     expect(skipped[0].reason).toContain("trùng số điện thoại")
+  })
+
+  it("reads the class from the first non-empty of the configured columns", () => {
+    // The Base spreads a student's class across "current", "trial" and
+    // "waiting" columns depending on where they are in their journey.
+    const withTrialOnly: LarkRecord = {
+      record_id: "rec9",
+      fields: {
+        "Họ và tên": "Le Van C",
+        "Số điện thoại": "0900000009",
+        "Lớp chính": "",
+        "Lớp học thử": "L0-04-26",
+      },
+    }
+    expect(mapLarkRecords([withTrialOnly], fields).students[0].className).toBe("L0-04-26")
+  })
+
+  it("prefers the first configured column when several are filled", () => {
+    const both: LarkRecord = {
+      record_id: "rec10",
+      fields: {
+        "Họ và tên": "Le Van D",
+        "Số điện thoại": "0900000010",
+        "Lớp chính": "L2-05-26",
+        "Lớp học thử": "L0-04-26",
+      },
+    }
+    expect(mapLarkRecords([both], fields).students[0].className).toBe("L2-05-26")
   })
 
   it("handles an empty base without throwing", () => {

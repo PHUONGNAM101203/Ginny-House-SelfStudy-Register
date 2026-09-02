@@ -51,6 +51,7 @@ export async function syncStudentsFromLark(): Promise<LarkSyncResult> {
       full_name: s.fullName,
       phone: s.phone,
       lark_record_id: s.larkRecordId,
+      class_name: s.className,
       active: true,
     })),
     { onConflict: "phone" }

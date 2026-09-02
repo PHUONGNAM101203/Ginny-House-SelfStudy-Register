@@ -8,6 +8,7 @@ import { sendPushToRole } from "@/lib/push/send"
 import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
 import type { ChatMessagePayload } from "@/lib/chat-realtime"
 import type { ActionResult } from "@/types"
+import { after } from "next/server"
 
 type ChatMessageRow = { id: string; sender_role: "guest" | "staff"; body: string; created_at: string }
 
@@ -164,8 +165,10 @@ export async function sendGuestChatMessageAction(
   // Same event send_guest_chat_message (migration 0007) already writes to
   // notifications for the bell — target_role null there means every staff
   // role, matched here.
-  void sendPushToRole(null, { title: "Tin nhắn chat mới", body: data.body, link: "/noi-bo/quan-ly/chat" })
-  void broadcastNotificationsUpdate()
+  after(async () => {
+    await sendPushToRole(null, { title: "Tin nhắn chat mới", body: data.body, link: "/noi-bo/quan-ly/chat" })
+  })
+  after(() => broadcastNotificationsUpdate())
 
   return { ok: true, data: { id: data.id, body: data.body, createdAt: data.created_at } }
 }

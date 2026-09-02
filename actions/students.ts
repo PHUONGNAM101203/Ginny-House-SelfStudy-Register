@@ -76,7 +76,11 @@ export async function updateStudentAction(input: unknown): Promise<ActionResult<
   const supabase = await createServerClient()
   const { error } = await supabase
     .from("students")
-    .update({ full_name: parsed.data.fullName, phone: parsed.data.phone })
+    .update({
+      full_name: parsed.data.fullName,
+      phone: parsed.data.phone,
+      class_name: parsed.data.className?.trim() || null,
+    })
     .eq("id", parsed.data.id)
   if (error) return { ok: false, error: error.code === "23505" ? "Số điện thoại đã được dùng bởi học sinh khác" : error.message }
 

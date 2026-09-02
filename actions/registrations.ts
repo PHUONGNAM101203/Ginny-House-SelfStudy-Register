@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath, refresh } from "next/cache"
+import { after } from "next/server"
 import { createPublicClient } from "@/lib/supabase/public"
 import { sendPushToRole } from "@/lib/push/send"
 import { broadcastNotificationsUpdate } from "@/lib/notification-realtime"
@@ -71,7 +72,22 @@ export async function createRegistrationAction(input: unknown): Promise<ActionRe
   }
 
   revalidatePath("/")
-  void broadcastNotificationsUpdate()
+  // The bell got its row from create_registration (migration 0017) and the
+  // realtime broadcast lit it up, but nothing ever pushed — so a phone with
+  // notifications switched on stayed silent for the most important event in
+  // the app. target_role null matches the notification row: every internal
+  // role, quản sinh included.
+  after(async () => {
+    await sendPushToRole(null, {
+      title: "Đăng ký lịch mới",
+      body:
+        parsed.data.fullName +
+        (parsed.data.className ? ` · ${parsed.data.className}` : "") +
+        ` — ${parsed.data.date} ${parsed.data.startTime}-${parsed.data.endTime}`,
+      link: "/noi-bo/lich",
+    })
+    await broadcastNotificationsUpdate()
+  })
   return { ok: true, data: { id: data.id } }
 }
 
@@ -93,6 +109,17 @@ export async function cancelRegistrationAction(input: unknown): Promise<ActionRe
   }
 
   revalidatePath("/")
+  // Matches the registration_cancelled row cancel_registration inserts
+  // (migration 0020) — Gin Anh's point was that a cancellation should reach
+  // people without anyone having to relay it by hand.
+  after(async () => {
+    await sendPushToRole(null, {
+      title: "Guest huỷ lịch",
+      body: parsed.data.fullName,
+      link: "/noi-bo/lich",
+    })
+    await broadcastNotificationsUpdate()
+  })
   return { ok: true, data: null }
 }
 
@@ -223,12 +250,14 @@ export async function requestRegistrationChangeAction(input: unknown): Promise<A
   // Fire-and-forget, matches the notifications row request_registration_change
   // (migration 0006) already inserts for the in-app bell — push is a second,
   // independent delivery channel for the same event, not authoritative.
-  void sendPushToRole("admin", {
-    title: parsed.data.kind === "cancel" ? "Yêu cầu huỷ lịch mới" : "Yêu cầu đổi lịch mới",
-    body: parsed.data.requestedByName,
-    link: "/noi-bo/quan-ly/yeu-cau-doi-lich",
+  after(async () => {
+    await sendPushToRole("admin", {
+      title: parsed.data.kind === "cancel" ? "Yêu cầu huỷ lịch mới" : "Yêu cầu đổi lịch mới",
+      body: parsed.data.requestedByName,
+      link: "/noi-bo/quan-ly/yeu-cau-doi-lich",
+    })
+    await broadcastNotificationsUpdate()
   })
-  void broadcastNotificationsUpdate()
 
   return { ok: true, data: { id: data.id } }
 }
@@ -253,6 +282,6 @@ export async function reviewRegistrationChangeAction(input: unknown): Promise<Ac
   revalidatePath("/noi-bo/lich")
   revalidatePath("/")
   refresh()
-  void broadcastNotificationsUpdate()
+  after(() => broadcastNotificationsUpdate())
   return { ok: true, data: null }
 }

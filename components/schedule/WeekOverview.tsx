@@ -223,7 +223,10 @@ export function WeekOverview({
                             // occupancy would make the name unreadable.
                             className={cn(
                               "flex h-full min-h-7 w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1 py-1 text-center text-[11px] leading-tight font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
-                              totalDesks === 0 && "bg-muted"
+                              // Same diagonal hatching as the day grid's locked
+                              // slots (app/globals.css) — a plain muted fill was
+                              // being read as bookable.
+                              totalDesks === 0 && "schedule-locked-hatch text-muted-foreground"
                             )}
                             style={kind ? BOOKING_KIND_STYLE[kind] : undefined}
                             aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}

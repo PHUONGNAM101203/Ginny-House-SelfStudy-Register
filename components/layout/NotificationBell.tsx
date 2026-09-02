@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { BellIcon, BellRingIcon, BellOffIcon, XIcon } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
-import { markNotificationsReadAction, deleteNotificationAction } from "@/actions/notifications"
+import { markNotificationsReadAction, deleteNotificationAction, deleteAllNotificationsAction } from "@/actions/notifications"
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/actions/push"
 import { subscribeToNotifications } from "@/lib/notification-realtime"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,29 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
     if (!result.ok) toast.error(result.error)
   }
 
+  const [clearing, setClearing] = useState(false)
+
+  async function clearAll() {
+    const ids = items.map((i) => i.id)
+    if (ids.length === 0) return
+    // Optimistic, same as deleteItem: the list empties immediately and the
+    // failure path puts it back rather than leaving a lie on screen.
+    const previous = items
+    const previousUnread = unreadCount
+    setItems([])
+    setUnreadCount(0)
+    setClearing(true)
+    const result = await deleteAllNotificationsAction(ids)
+    setClearing(false)
+    if (!result.ok) {
+      setItems(previous)
+      setUnreadCount(previousUnread)
+      toast.error(result.error)
+      return
+    }
+    toast.success(`Đã xoá ${result.data.count} thông báo`)
+  }
+
   async function subscribeToPush() {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     if (!publicKey) return toast.error("Chưa cấu hình thông báo đẩy")
@@ -141,7 +164,26 @@ export function NotificationBell({ initialUnreadCount, items: initialItems }: { 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>Thông báo</DropdownMenuLabel>
+        <div className="flex items-center justify-between gap-2 pr-1">
+          <DropdownMenuLabel>Thông báo</DropdownMenuLabel>
+          {items.length > 0 && (
+            <button
+              type="button"
+              // Inside a dropdown, a plain button still closes the menu on
+              // click — stopPropagation keeps the list open so the emptied
+              // state is visible instead of the panel vanishing.
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                void clearAll()
+              }}
+              disabled={clearing}
+              className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+            >
+              {clearing ? "Đang xoá..." : "Xoá tất cả"}
+            </button>
+          )}
+        </div>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
           <p className="px-2 py-4 text-center text-sm text-muted-foreground">Chưa có thông báo nào.</p>
