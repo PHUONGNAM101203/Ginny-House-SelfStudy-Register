@@ -6,17 +6,6 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createStudentSchema, updateStudentSchema, importStudentsSchema, createRecurringScheduleSchema } from "@/lib/validations/student"
 import type { ActionResult } from "@/types"
 
-export async function getStudentHistoryAction(studentId: string) {
-  await requireAdmin()
-  const supabase = await createServerClient()
-  const { data } = await supabase
-    .from("registrations")
-    .select("date, start_time, end_time, status, source")
-    .eq("student_id", studentId)
-    .order("date", { ascending: false })
-  return data ?? []
-}
-
 export async function createStudentAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   await requireAdmin()
   const parsed = createStudentSchema.safeParse(input)
