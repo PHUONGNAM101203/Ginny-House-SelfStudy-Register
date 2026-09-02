@@ -8,6 +8,7 @@ import { toYmd } from "@/lib/vn-date"
 import { ScheduleToolbar } from "@/components/schedule/ScheduleToolbar"
 import { InternalScheduleGridClient } from "@/components/schedule/InternalScheduleGridClient"
 import { WeekOverview } from "@/components/schedule/WeekOverview"
+import { ScheduleLegend } from "@/components/schedule/ScheduleLegend"
 import type { ScheduleView } from "@/components/schedule/ViewToggle"
 
 export default async function InternalCalendarPage({
@@ -27,7 +28,11 @@ export default async function InternalCalendarPage({
   // Same single-day-view / week-fetch split as the guest page.
   const { selectedDate, monday } = resolveScheduleDates(params.day, params.week)
   await materializeWeek(monday)
-  const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday) : null
+  // Internal calendar only: cancelled bookings stay visible here so quản sinh
+  // and admin can see who dropped out, per Gin Anh. The guest page keeps
+  // fetching active rows only — a guest seeing someone else's cancellation is
+  // noise, and the slot reads as free to them, which it is.
+  const schedule = activeBranchId ? await getScheduleData(activeBranchId, monday, { includeCancelled: true }) : null
 
   // Phone numbers are staff-only — fetched here with the authenticated
   // client (passes students' RLS is_staff() check), never through
@@ -49,6 +54,7 @@ export default async function InternalCalendarPage({
     <div className="min-w-0">
       <h1 className="mb-4 text-xl font-semibold">Lịch tự học</h1>
       <ScheduleToolbar branches={branches} activeBranchId={activeBranchId} selectedDate={selectedDate} monday={monday} view={view} />
+      <ScheduleLegend />
       {schedule &&
         (view === "week" ? (
           <WeekOverview

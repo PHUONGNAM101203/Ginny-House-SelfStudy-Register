@@ -4,6 +4,7 @@ import { vi } from "date-fns/locale"
 import { TIME_SLOTS, type TimeSlot } from "@/lib/time-slots"
 import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
+import { bookingKind, BOOKING_KIND_LABEL, BOOKING_KIND_STYLE } from "@/lib/booking-kind"
 
 type Desk = { id: string; label: string }
 type Registration = {
@@ -16,6 +17,8 @@ type Registration = {
   studentName: string
   className: string | null
   recurringRegistrationId: string | null
+  /** Cancelled bookings reach this component on internal pages only. */
+  status?: "active" | "cancelled"
 }
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
@@ -203,6 +206,7 @@ export function WeekOverview({
                       const { totalDesks, matches, rowSpan } = cell
                       const first = matches[0]
                       const phone = first ? phoneByStudentId?.get(first.studentId) : undefined
+                      const kind = first ? bookingKind(first) : null
                       const label =
                         totalDesks === 0
                           ? "Không có chỗ"
@@ -221,11 +225,7 @@ export function WeekOverview({
                               "flex h-full min-h-7 w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1 py-1 text-center text-[11px] leading-tight font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
                               totalDesks === 0 && "bg-muted"
                             )}
-                            style={
-                              first
-                                ? { backgroundColor: "color-mix(in oklch, var(--primary) 12%, var(--card))", color: "var(--primary)" }
-                                : undefined
-                            }
+                            style={kind ? BOOKING_KIND_STYLE[kind] : undefined}
                             aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
                             title={label}
                           >
@@ -237,7 +237,7 @@ export function WeekOverview({
                                 </span>
                                 {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
                                 <span className="w-full truncate text-[10px] font-normal opacity-70">
-                                  {first.recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
+                                  {kind && BOOKING_KIND_LABEL[kind]}
                                 </span>
                               </>
                             )}

@@ -6,6 +6,7 @@ import { vi } from "date-fns/locale"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
 import { parseYmd } from "@/lib/vn-date"
 import "react-big-calendar/lib/css/react-big-calendar.css"
+import { bookingKind, BOOKING_KIND_LABEL, BOOKING_KIND_STYLE } from "@/lib/booking-kind"
 
 export type SlotClickPayload = {
   desk: Desk
@@ -40,7 +41,7 @@ function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneB
       </span>
       {phone && <span className="truncate font-normal opacity-80">{phone}</span>}
       <span className="truncate font-normal opacity-70">
-        {event.registration.recurringRegistrationId ? "Lịch cố định" : "Lịch bình thường"}
+        {BOOKING_KIND_LABEL[bookingKind(event.registration)]}
       </span>
     </div>
   )
@@ -161,8 +162,13 @@ export function ScheduleGrid({
   const date = parseYmd(dateStr)
   const isoDow = ((date.getDay() + 6) % 7) + 1
 
+  // Cancelled cards are shown for visibility only (Gin Anh: so quản sinh can
+  // see who dropped out) — the slot itself is free, so as far as booking is
+  // concerned there is no registration there.
   function findRegistration(deskId: string, startTime: string) {
-    return registrations.find((r) => r.deskId === deskId && r.date === dateStr && r.startTime === startTime)
+    return registrations.find(
+      (r) => r.deskId === deskId && r.date === dateStr && r.startTime === startTime && r.status !== "cancelled"
+    )
   }
 
   function isLocked(deskId: string, startTime: string, endTime: string) {
@@ -227,7 +233,9 @@ export function ScheduleGrid({
       date: dateStr,
       startTime: event.registration.startTime,
       endTime: event.registration.endTime,
-      registration: event.registration,
+      // Clicking a cancelled card opens the booking flow rather than a cancel
+      // dialog for someone who already left — the half hour is available.
+      registration: event.registration.status === "cancelled" ? undefined : event.registration,
     })
   }
 
@@ -346,6 +354,9 @@ export function ScheduleGrid({
                 scrollToTime={timeOnDate(date, block.start)}
                 onSelectSlot={handleSelectSlot}
                 onSelectEvent={handleSelectEvent}
+                // The three kinds are told apart by colour, not just by the
+                // label inside the chip — see lib/booking-kind.ts.
+                eventPropGetter={(event) => ({ style: BOOKING_KIND_STYLE[bookingKind(event.registration)] })}
                 slotPropGetter={makeSlotPropGetter(block.end)}
                 components={{ event: (props) => <EventContent {...props} phoneByStudentId={phoneByStudentId} /> }}
               />

@@ -23,10 +23,20 @@ export type RegistrationRow = {
    * later auto-materialized weeks — see migration 0002).
    */
   recurringRegistrationId: string | null
+  /**
+   * 'cancelled' rows are only ever fetched for the internal calendar (see
+   * getScheduleData's includeCancelled). Gin Anh: quản sinh needs to see who
+   * dropped out without anyone having to message them about it.
+   */
+  status: "active" | "cancelled"
 }
 export type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
 
-export async function getScheduleData(branchId: string, weekMonday: Date) {
+export async function getScheduleData(
+  branchId: string,
+  weekMonday: Date,
+  { includeCancelled = false }: { includeCancelled?: boolean } = {}
+) {
   const supabase = createPublicClient()
   const dates = getWeekDates(weekMonday)
   const from = format(dates[0], "yyyy-MM-dd")
@@ -38,9 +48,9 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     supabase.from("desks").select("id, label").eq("branch_id", branchId).eq("active", true),
     supabase
       .from("registrations")
-      .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name, recurring_registration_id")
+      .select("id, desk_id, student_id, date, start_time, end_time, student_name, class_name, recurring_registration_id, status")
       .eq("branch_id", branchId)
-      .eq("status", "active")
+      .in("status", includeCancelled ? ["active", "cancelled"] : ["active"])
       .gte("date", from)
       .lte("date", to)
       // .limit(10000) matches supabase/config.toml's raised `max_rows`: explicit and intentional
@@ -50,20 +60,34 @@ export async function getScheduleData(branchId: string, weekMonday: Date) {
     supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("branch_id", branchId).eq("active", true),
   ])
 
+  const rows = (registrations ?? []).map((r) => ({
+    id: r.id,
+    deskId: r.desk_id,
+    studentId: r.student_id,
+    date: r.date,
+    startTime: toHm(r.start_time),
+    endTime: toHm(r.end_time),
+    studentName: r.student_name,
+    className: r.class_name,
+    recurringRegistrationId: r.recurring_registration_id,
+    status: r.status,
+  })) as RegistrationRow[]
+
+  // A cancelled slot that someone else has since taken is no longer news —
+  // showing both would stack two cards on one slot and make the grid lie
+  // about who is sitting there. The live booking wins; the cancelled card
+  // only survives while the slot is genuinely empty.
+  const takenSlots = new Set(
+    rows.filter((r) => r.status === "active").map((r) => `${r.deskId}|${r.date}|${r.startTime}`)
+  )
+  const visible = rows.filter(
+    (r) => r.status === "active" || !takenSlots.has(`${r.deskId}|${r.date}|${r.startTime}`)
+  )
+
   return {
     // Desk order is the grid's column order, so it has to be numeric.
     desks: sortDesks((desks ?? []) as Desk[]),
-    registrations: (registrations ?? []).map((r) => ({
-      id: r.id,
-      deskId: r.desk_id,
-      studentId: r.student_id,
-      date: r.date,
-      startTime: toHm(r.start_time),
-      endTime: toHm(r.end_time),
-      studentName: r.student_name,
-      className: r.class_name,
-      recurringRegistrationId: r.recurring_registration_id,
-    })) as RegistrationRow[],
+    registrations: visible,
     locks: (locks ?? []).map((l) => ({
       deskId: l.desk_id,
       dayOfWeek: l.day_of_week,
