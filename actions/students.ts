@@ -91,22 +91,27 @@ export async function updateStudentAction(input: unknown): Promise<ActionResult<
  * would silently erase that history. Blocked here the same way
  * deleteDeskAction guards desks.
  */
+/**
+ * Deleting a student takes their bookings with them: registrations and
+ * recurring_registrations both reference students ON DELETE CASCADE.
+ *
+ * This used to refuse outright whenever any booking row existed, which in
+ * practice meant it could almost never be used — cancelling a booking only
+ * sets status = 'cancelled', the row stays, so an admin who had cleared
+ * every schedule off the calendar still got "không thể xoá để giữ lịch sử".
+ * Gin Anh wants the delete to actually work. So the guard is now informed
+ * consent instead of a block: the confirm dialog states exactly how many
+ * bookings will go, and the caller decides.
+ */
 export async function deleteStudentAction(studentId: string): Promise<ActionResult<null>> {
   await requireAdmin()
   const supabase = await createServerClient()
-
-  const [{ count: regCount }, { count: recurringCount }] = await Promise.all([
-    supabase.from("registrations").select("id", { count: "exact", head: true }).eq("student_id", studentId),
-    supabase.from("recurring_registrations").select("id", { count: "exact", head: true }).eq("student_id", studentId),
-  ])
-  if ((regCount && regCount > 0) || (recurringCount && recurringCount > 0)) {
-    return { ok: false, error: "Học sinh này đã có lịch sử đăng ký — không thể xoá để giữ lịch sử" }
-  }
 
   const { error } = await supabase.from("students").delete().eq("id", studentId)
   if (error) return { ok: false, error: error.message }
 
   revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  revalidatePath("/noi-bo/lich")
   refresh()
   return { ok: true, data: null }
 }

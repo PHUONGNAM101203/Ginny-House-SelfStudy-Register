@@ -30,7 +30,15 @@ type RecurringQueryRow = {
 export default async function StudentsPage() {
   await requireAdmin()
   const supabase = await createServerClient()
-  const [{ data: students }, { data: recurring }, { data: recentRegistrations }, { data: branches }, { data: desks }] = await Promise.all([
+  const [
+    { data: students },
+    { data: recurring },
+    { data: recentRegistrations },
+    { data: branches },
+    { data: desks },
+    { data: allRegistrations },
+    { data: allRecurring },
+  ] = await Promise.all([
     supabase.from("students").select("id, full_name, phone, created_at").order("full_name"),
     supabase
       .from("recurring_registrations")
@@ -48,6 +56,11 @@ export default async function StudentsPage() {
     // For CreateRecurringScheduleDialog's cơ sở/chỗ selects.
     supabase.from("branches").select("id, code, name").order("name"),
     supabase.from("desks").select("id, branch_id, label"),
+    // How much history each student would lose if deleted — the delete
+    // dialog names the number rather than refusing (see deleteStudentAction).
+    // Includes cancelled rows on purpose: the cascade removes those too.
+    supabase.from("registrations").select("student_id"),
+    supabase.from("recurring_registrations").select("student_id"),
   ])
 
   const recurringRows: RecurringRow[] = ((recurring ?? []) as unknown as RecurringQueryRow[]).map((r) => ({
@@ -68,6 +81,12 @@ export default async function StudentsPage() {
     if (!latestClassByStudentId.has(r.student_id) && r.class_name) latestClassByStudentId.set(r.student_id, r.class_name)
   }
 
+  const bookingCountByStudentId = new Map<string, number>()
+  for (const row of [...(allRegistrations ?? []), ...(allRecurring ?? [])]) {
+    if (!row.student_id) continue
+    bookingCountByStudentId.set(row.student_id, (bookingCountByStudentId.get(row.student_id) ?? 0) + 1)
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -80,7 +99,11 @@ export default async function StudentsPage() {
           </div>
         </div>
         <StudentTable
-          students={(students ?? []).map((s) => ({ ...s, class_name: latestClassByStudentId.get(s.id) ?? null }))}
+          students={(students ?? []).map((s) => ({
+            ...s,
+            class_name: latestClassByStudentId.get(s.id) ?? null,
+            booking_count: bookingCountByStudentId.get(s.id) ?? 0,
+          }))}
         />
       </div>
       <div>

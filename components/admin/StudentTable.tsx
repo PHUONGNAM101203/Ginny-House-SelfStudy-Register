@@ -15,7 +15,26 @@ import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
 import { matchesAllTerms } from "@/lib/vn-text"
 
 /** class_name is a "most recent known class" read from that student's registrations, not a stored attribute of the student. */
-type Student = { id: string; full_name: string; phone: string; created_at: string; class_name: string | null }
+type Student = {
+  id: string
+  full_name: string
+  phone: string
+  created_at: string
+  class_name: string | null
+  /** Registrations + recurring rules that the delete cascade would remove. */
+  booking_count: number
+}
+
+/**
+ * Deleting a student cascades to their registrations and recurring rules, so
+ * the dialog names the number instead of the app refusing the delete — see
+ * deleteStudentAction for why the old blanket block had to go.
+ */
+function deleteDescription(student: Student): string {
+  return student.booking_count > 0
+    ? `Xoá luôn ${student.booking_count} lịch đăng ký của học sinh này (kể cả lịch đã huỷ và lịch cố định). Không khôi phục lại được.`
+    : "Học sinh này chưa có lịch đăng ký nào. Không khôi phục lại được."
+}
 
 function EditStudentDialog({ student }: { student: Student }) {
   const [open, setOpen] = useState(false)
@@ -129,7 +148,7 @@ export function StudentTable({ students }: { students: Student[] }) {
                     <EditStudentDialog student={s} />
                     <DeleteConfirmButton
                       title={`Xoá học sinh ${s.full_name}?`}
-                      description="Không thể xoá nếu học sinh đã có lịch sử đăng ký — dữ liệu này cần được giữ lại."
+                      description={deleteDescription(s)}
                       onConfirm={() => deleteStudentAction(s.id)}
                     />
                   </div>
@@ -150,7 +169,7 @@ export function StudentTable({ students }: { students: Student[] }) {
             <EditStudentDialog student={s} />
             <DeleteConfirmButton
               title={`Xoá học sinh ${s.full_name}?`}
-              description="Không thể xoá nếu học sinh đã có lịch sử đăng ký — dữ liệu này cần được giữ lại."
+              description={deleteDescription(s)}
               onConfirm={() => deleteStudentAction(s.id)}
             />
           </div>
