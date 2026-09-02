@@ -17,8 +17,9 @@ export default async function HomePage({
   // rejects the array form).
   searchParams: Promise<{ branch?: string | string[]; week?: string | string[]; day?: string | string[]; view?: string | string[] }>
 }) {
-  const params = await searchParams
-  const branches = await getBranches()
+  // Independent of each other — awaiting them in a row cost two serial
+  // round-trips before the page could start on the schedule itself.
+  const [params, branches] = await Promise.all([searchParams, getBranches()])
   const activeBranchId = resolveActiveBranchId(branches, params.branch)
   const view: ScheduleView = params.view === "week" ? "week" : "day"
   // The grid shows one day; the fetch still covers that day's whole week (see

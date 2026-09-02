@@ -14,9 +14,14 @@ export default async function InternalCalendarPage({
   searchParams,
   // string | string[]: same repeated-param handling as the guest page.
 }: { searchParams: Promise<{ branch?: string | string[]; week?: string | string[]; day?: string | string[]; view?: string | string[] }> }) {
-  const profile = await requireProfile()
-  const params = await searchParams
-  const branches = await getBranches()
+  // These three don't depend on each other, and awaiting them in a row cost
+  // three serial Supabase round-trips before the page could even work out
+  // which week to render — the bulk of the delay on clicking the logo.
+  const [profile, params, branches] = await Promise.all([
+    requireProfile(),
+    searchParams,
+    getBranches(),
+  ])
   const activeBranchId = resolveActiveBranchId(branches, params.branch)
   const view: ScheduleView = params.view === "week" ? "week" : "day"
   // Same single-day-view / week-fetch split as the guest page.
