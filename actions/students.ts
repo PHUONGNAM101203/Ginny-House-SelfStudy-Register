@@ -3,8 +3,48 @@
 import { revalidatePath, refresh } from "next/cache"
 import { requireAdmin } from "@/lib/auth"
 import { createServerClient } from "@/lib/supabase/server"
-import { createStudentSchema, updateStudentSchema, importStudentsSchema, createRecurringScheduleSchema } from "@/lib/validations/student"
+import { createStudentSchema, updateStudentSchema, importStudentsSchema, createRecurringScheduleSchema, searchStudentsSchema } from "@/lib/validations/student"
 import type { ActionResult } from "@/types"
+
+export type StudentSearchHit = {
+  id: string
+  fullName: string
+  className: string | null
+  /**
+   * Null for anonymous guests — search_students (migration 0021) only
+   * returns a phone to staff, so the guest-facing autocomplete can fill in
+   * lớp without turning the booking form into a phone-number directory.
+   */
+  phone: string | null
+}
+
+/**
+ * Deliberately NOT admin-guarded: the guest booking form uses this too, and
+ * the RPC itself decides what each caller is allowed to see.
+ */
+export async function searchStudentsAction(input: unknown): Promise<ActionResult<StudentSearchHit[]>> {
+  const parsed = searchStudentsSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Từ khoá không hợp lệ" }
+
+  // The public client for guests, the authenticated one for staff — the RPC
+  // reads is_staff() off the session to decide whether to include phone, so
+  // sending a staff request through the anon client would silently downgrade
+  // them to guest results.
+  const supabase = await createServerClient()
+  const { data, error } = await supabase.rpc("search_students", { p_query: parsed.data.query })
+  if (error) return { ok: false, error: error.message }
+
+  type Row = { id: string; full_name: string; class_name: string | null; phone: string | null }
+  return {
+    ok: true,
+    data: ((data ?? []) as Row[]).map((r) => ({
+      id: r.id,
+      fullName: r.full_name,
+      className: r.class_name,
+      phone: r.phone,
+    })),
+  }
+}
 
 export async function createStudentAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   await requireAdmin()

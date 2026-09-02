@@ -45,3 +45,7 @@ export const createRecurringScheduleSchema = z
     path: ["endDate"],
   })
 export type CreateRecurringScheduleInput = z.infer<typeof createRecurringScheduleSchema>
+
+export const searchStudentsSchema = z.object({
+  query: z.string().trim().min(2, "Nhập ít nhất 2 ký tự"),
+})

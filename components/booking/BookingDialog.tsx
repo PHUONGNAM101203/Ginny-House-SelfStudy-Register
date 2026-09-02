@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { StudentAutocomplete } from "@/components/students/StudentAutocomplete"
+import type { StudentSearchHit } from "@/actions/students"
 import type { ActionResult } from "@/types"
 
 export function BookingDialog({
@@ -33,6 +35,7 @@ export function BookingDialog({
   })
 
   const phone = watch("phone")
+  const fullName = watch("fullName") ?? ""
   const [suggestion, setSuggestion] = useState<StudentLookupResult | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState(false)
 
@@ -52,6 +55,17 @@ export function BookingDialog({
     }, 400)
     return () => clearTimeout(timeout)
   }, [phone])
+
+  /**
+   * Picking a name off the autocomplete fills in whatever the database was
+   * willing to hand this caller: lớp for everyone, phone only for staff
+   * (search_students, migration 0021). A guest still types their own number.
+   */
+  function applyStudent(hit: StudentSearchHit) {
+    if (hit.className) setValue("className", hit.className)
+    if (hit.phone) setValue("phone", hit.phone)
+    setDismissedSuggestion(true)
+  }
 
   function applySuggestion() {
     if (!suggestion) return
@@ -91,7 +105,13 @@ export function BookingDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="fullName">Họ tên</Label>
-            <Input id="fullName" {...register("fullName")} />
+            <StudentAutocomplete
+              id="fullName"
+              value={fullName}
+              onValueChange={(v) => setValue("fullName", v, { shouldValidate: true })}
+              onSelect={applyStudent}
+              placeholder="Gõ tên để chọn từ danh sách"
+            />
             {errors.fullName && <p className="text-sm text-destructive">{errors.fullName.message}</p>}
           </div>
           <div className="flex flex-col gap-1.5">

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { PencilIcon } from "lucide-react"
+import { PencilIcon, SearchIcon } from "lucide-react"
 import { updateStudentAction, deleteStudentAction } from "@/actions/students"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DialogForm } from "@/components/ui/dialog-form"
 import { ResponsiveList } from "@/components/admin/ResponsiveList"
 import { DeleteConfirmButton } from "@/components/admin/DeleteConfirmButton"
+import { matchesAllTerms } from "@/lib/vn-text"
 
 /** class_name is a "most recent known class" read from that student's registrations, not a stored attribute of the student. */
 type Student = { id: string; full_name: string; phone: string; created_at: string; class_name: string | null }
@@ -62,11 +63,53 @@ function EditStudentDialog({ student }: { student: Student }) {
   )
 }
 
+const PAGE_SIZE = 50
+
 export function StudentTable({ students }: { students: Student[] }) {
+  const [query, setQuery] = useState("")
+  const [page, setPage] = useState(0)
+
+  // Filtering client-side: the page already has every student in hand, and
+  // the list is in the hundreds, not the millions. Name, lớp and SĐT all go
+  // into one haystack so "0946" and "bich ngoc" both work, accent- and
+  // case-insensitively (lib/vn-text.ts).
+  const filtered = useMemo(() => {
+    if (!query.trim()) return students
+    return students.filter((s) =>
+      matchesAllTerms(`${s.full_name} ${s.class_name ?? ""} ${s.phone}`, query)
+    )
+  }, [students, query])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // Narrowing the search can leave `page` past the end of the new result set,
+  // which would render an empty table over matching rows.
+  const safePage = Math.min(page, pageCount - 1)
+  const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+
   return (
+    <div className="flex flex-col gap-3">
+      <div className="relative max-w-sm">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          placeholder="Tìm theo tên, lớp hoặc SĐT..."
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setPage(0)
+          }}
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {query.trim()
+          ? `${filtered.length} kết quả trong ${students.length} học sinh`
+          : `${students.length} học sinh`}
+      </p>
+
     <ResponsiveList
-      items={students}
-      emptyMessage="Chưa có học sinh nào."
+      items={visible}
+      emptyMessage={query.trim() ? "Không tìm thấy học sinh nào khớp." : "Chưa có học sinh nào."}
       table={
         <Table>
           <TableHeader>
@@ -75,7 +118,7 @@ export function StudentTable({ students }: { students: Student[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {students.map((s) => (
+            {visible.map((s) => (
               <TableRow key={s.id}>
                 <TableCell>{s.full_name}</TableCell>
                 <TableCell>{s.class_name ?? "—"}</TableCell>
@@ -114,5 +157,27 @@ export function StudentTable({ students }: { students: Student[] }) {
         </div>
       )}
     />
+
+      {pageCount > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Trang {safePage + 1} / {pageCount}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+              Trước
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage(safePage + 1)}
+            >
+              Sau
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
