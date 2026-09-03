@@ -1,48 +1,5 @@
 import { TIME_SLOTS } from "@/lib/time-slots"
 
-export type OccupancyRow = { deskId: string; date: string; totalSlots: number; bookedSlots: number; rate: number }
-
-function isoDayOfWeek(dateStr: string): number {
-  const date = new Date(`${dateStr}T00:00:00Z`)
-  return ((date.getUTCDay() + 6) % 7) + 1
-}
-
-export function computeOccupancy(
-  desks: { id: string; label: string }[],
-  registrations: { deskId: string; date: string; startTime: string; endTime: string }[],
-  locks: { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }[],
-  dates: string[]
-): OccupancyRow[] {
-  return desks.flatMap((desk) =>
-    dates.map((date) => {
-      const isoDow = isoDayOfWeek(date)
-      const availableSlots = TIME_SLOTS.filter(
-        (slot) =>
-          !locks.some(
-            (l) => (l.deskId === desk.id || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < slot.end && l.endTime > slot.start
-          )
-      )
-      // Count SLOTS covered, not registration rows. Since Task 8b's react-big-calendar
-      // rewrite a single registration can span a drag-selected multi-slot range
-      // (e.g. 08:00-10:00 = 4 slots in one row), so counting rows silently
-      // under-reported occupancy. Same half-open [start, end) overlap check used by
-      // ScheduleGrid's isLocked and the booking RPCs.
-      const booked = availableSlots.filter((slot) =>
-        registrations.some(
-          (r) => r.deskId === desk.id && r.date === date && r.startTime < slot.end && r.endTime > slot.start
-        )
-      ).length
-      return {
-        deskId: desk.id,
-        date,
-        totalSlots: availableSlots.length,
-        bookedSlots: booked,
-        rate: availableSlots.length === 0 ? 0 : booked / availableSlots.length,
-      }
-    })
-  )
-}
-
 export type MissingStudent = { studentId: string; studentName: string; phone: string; className: string | null }
 
 function addDaysToDateStr(dateStr: string, days: number): string {
