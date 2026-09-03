@@ -18,7 +18,7 @@ export type SlotClickPayload = {
 
 type BookingEvent = {
   id: string
-  title: string
+  title: string | null
   start: Date
   end: Date
   resourceId: string
@@ -32,7 +32,18 @@ type BookingEvent = {
  * one, so this silently degrades to name+class when undefined.
  */
 function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneByStudentId?: Map<string, string> }) {
-  const phone = phoneByStudentId?.get(event.registration.studentId)
+  const kind = bookingKind(event.registration)
+  const phone = event.registration.studentId ? phoneByStudentId?.get(event.registration.studentId) : undefined
+
+  // A vacant placeholder has no name, lớp or SĐT to show — only what it is.
+  if (kind === "vacant") {
+    return (
+      <div className="flex flex-col leading-tight italic">
+        <span className="truncate">{BOOKING_KIND_LABEL.vacant}</span>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col leading-tight">
       <span className="truncate">
@@ -40,9 +51,7 @@ function EventContent({ event, phoneByStudentId }: { event: BookingEvent; phoneB
         {event.registration.className && ` · ${event.registration.className}`}
       </span>
       {phone && <span className="truncate font-normal opacity-80">{phone}</span>}
-      <span className="truncate font-normal opacity-70">
-        {BOOKING_KIND_LABEL[bookingKind(event.registration)]}
-      </span>
+      <span className="truncate font-normal opacity-70">{BOOKING_KIND_LABEL[kind]}</span>
     </div>
   )
 }
@@ -165,9 +174,16 @@ export function ScheduleGrid({
   // Cancelled cards are shown for visibility only (Gin Anh: so quản sinh can
   // see who dropped out) — the slot itself is free, so as far as booking is
   // concerned there is no registration there.
+  // Cancelled cards are shown for visibility only, and a vacant placeholder is
+  // by definition free — neither counts as a registration when booking.
   function findRegistration(deskId: string, startTime: string) {
     return registrations.find(
-      (r) => r.deskId === deskId && r.date === dateStr && r.startTime === startTime && r.status !== "cancelled"
+      (r) =>
+        r.deskId === deskId &&
+        r.date === dateStr &&
+        r.startTime === startTime &&
+        r.status !== "cancelled" &&
+        r.studentId !== null
     )
   }
 
@@ -182,7 +198,12 @@ export function ScheduleGrid({
     .map((r) => ({
       id: r.id,
       // Gin Anh: the chip needs to name which class booked it, not just who.
-      title: r.className ? `${r.studentName} · ${r.className}` : r.studentName,
+      title:
+        r.studentId === null
+          ? BOOKING_KIND_LABEL.vacant
+          : r.className
+            ? `${r.studentName} · ${r.className}`
+            : r.studentName,
       start: timeOnDate(date, r.startTime),
       end: timeOnDate(date, r.endTime),
       resourceId: r.deskId,
@@ -233,9 +254,13 @@ export function ScheduleGrid({
       date: dateStr,
       startTime: event.registration.startTime,
       endTime: event.registration.endTime,
-      // Clicking a cancelled card opens the booking flow rather than a cancel
-      // dialog for someone who already left — the half hour is available.
-      registration: event.registration.status === "cancelled" ? undefined : event.registration,
+      // A cancelled card, or a vacant placeholder, means the half hour is
+      // available — clicking either opens the booking flow rather than a
+      // detail dialog for someone who isn't there.
+      registration:
+        event.registration.status === "cancelled" || event.registration.studentId === null
+          ? undefined
+          : event.registration,
     })
   }
 

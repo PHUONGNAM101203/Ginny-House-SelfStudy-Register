@@ -239,8 +239,14 @@ export async function deactivateRecurringRegistrationAction(id: string): Promise
  * uses), so auth.uid() resolves inside the RPC and its `is_admin()` branch
  * (see migration 0002) short-circuits before the name/phone check ever runs.
  */
+/**
+ * A staff cancel — no phiếu, no review. Quản sinh huỷ được luôn since
+ * migration 0034; only a học sinh has to ask. The name is left as-is so
+ * every call site doesn't churn, but the guard is staff-wide now and
+ * cancel_registration enforces the same thing server-side.
+ */
 export async function cancelRegistrationAsAdminAction(input: unknown): Promise<ActionResult<null>> {
-  await requireAdmin()
+  await requireProfile()
   const parsed = adminCancelRegistrationSchema.safeParse(input)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }

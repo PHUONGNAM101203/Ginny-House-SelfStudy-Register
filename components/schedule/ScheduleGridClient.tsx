@@ -4,10 +4,11 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ScheduleGrid, type SlotClickPayload } from "@/components/schedule/ScheduleGrid"
 import { BookingDialog } from "@/components/booking/BookingDialog"
-import { CancelDialog } from "@/components/booking/CancelDialog"
+import { BookingDetailDialog } from "@/components/booking/BookingDetailDialog"
 import { RequestChangeDialog } from "@/components/booking/RequestChangeDialog"
 import { GuestChatWidget, type GuestRegistration } from "@/components/chat/GuestChatWidget"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
+import { readMyRegistrationIds } from "@/lib/my-registrations"
 
 export function ScheduleGridClient({
   desks, date, registrations, locks,
@@ -22,9 +23,15 @@ export function ScheduleGridClient({
   // Read once on mount, not during render — localStorage doesn't exist
   // during SSR. Set by BookingDialog right after a successful booking.
   const [activeRegistration, setActiveRegistration] = useState<GuestRegistration | null>(null)
+  // Which bookings this browser made. The single `activeRegistration` above
+  // only ever remembers the latest one, but a guest who booked three slots
+  // should be able to open all three — so BookingDialog also appends every
+  // id here (see MY_REGISTRATIONS_KEY).
+  const [myIds, setMyIds] = useState<Set<string>>(new Set())
   useEffect(() => {
     const raw = localStorage.getItem("activeRegistration")
     if (raw) setActiveRegistration(JSON.parse(raw))
+    setMyIds(readMyRegistrationIds())
   }, [])
 
   function closeAll() {
@@ -50,19 +57,26 @@ export function ScheduleGridClient({
             // immediately without waiting for a full page reload.
             const raw = localStorage.getItem("activeRegistration")
             if (raw) setActiveRegistration(JSON.parse(raw))
+            setMyIds(readMyRegistrationIds())
             router.refresh()
           }}
         />
       )}
       {selected?.registration && !requestingChange && (
-        <CancelDialog
+        <BookingDetailDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
+          audience={myIds.has(selected.registration.id) ? "guest-own" : "guest-other"}
+          registrationId={selected.registration.id}
           deskLabel={selected.desk.label}
+          date={selected.date}
           startTime={selected.startTime}
           endTime={selected.endTime}
-          isRecurring={selected.registration.recurringRegistrationId !== null}
-          onRequestChangeInstead={() => setRequestingChange(true)}
+          studentName={selected.registration.studentName}
+          className={selected.registration.className}
+          recurringRegistrationId={selected.registration.recurringRegistrationId}
+          onSuccess={() => router.refresh()}
+          onRequestCancel={() => setRequestingChange(true)}
         />
       )}
       {selected?.registration && requestingChange && (
@@ -74,7 +88,7 @@ export function ScheduleGridClient({
           date={selected.date}
           startTime={selected.startTime}
           endTime={selected.endTime}
-          studentName={selected.registration.studentName}
+          studentName={selected.registration.studentName ?? ""}
           className={selected.registration.className}
           desks={desks}
           registrations={registrations}

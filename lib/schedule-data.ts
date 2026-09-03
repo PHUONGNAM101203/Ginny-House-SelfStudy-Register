@@ -9,11 +9,12 @@ export type Desk = { id: string; label: string }
 export type RegistrationRow = {
   id: string
   deskId: string
-  studentId: string
+  /** Null = a vacant recurring placeholder (migration 0034). */
+  studentId: string | null
   date: string
   startTime: string
   endTime: string
-  studentName: string
+  studentName: string | null
   /** Null for rows created before this field existed (migration 0005). */
   className: string | null
   /**

@@ -9,12 +9,12 @@ import { bookingKind, BOOKING_KIND_LABEL, BOOKING_KIND_STYLE } from "@/lib/booki
 type Desk = { id: string; label: string }
 type Registration = {
   id: string
-  studentId: string
+  studentId: string | null
   deskId: string
   date: string
   startTime: string
   endTime: string
-  studentName: string
+  studentName: string | null
   className: string | null
   recurringRegistrationId: string | null
   /** Cancelled bookings reach this component on internal pages only. */
@@ -205,14 +205,18 @@ export function WeekOverview({
                       if (cell.skip) return null
                       const { totalDesks, matches, rowSpan } = cell
                       const first = matches[0]
-                      const phone = first ? phoneByStudentId?.get(first.studentId) : undefined
                       const kind = first ? bookingKind(first) : null
+                      const phone = first?.studentId ? phoneByStudentId?.get(first.studentId) : undefined
                       const label =
                         totalDesks === 0
                           ? "Không có chỗ"
                           : matches.length === 0
                             ? "Còn trống"
-                            : matches.map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName)).join(", ")
+                            : kind === "vacant"
+                              ? BOOKING_KIND_LABEL.vacant
+                              : matches
+                                  .map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName))
+                                  .join(", ")
                       return (
                         <td key={dateStr} rowSpan={rowSpan} className="border-b border-l border-border p-0 align-middle">
                           <Link
@@ -232,7 +236,10 @@ export function WeekOverview({
                             aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
                             title={label}
                           >
-                            {first && (
+                            {kind === "vacant" && (
+                              <span className="w-full truncate italic">{BOOKING_KIND_LABEL.vacant}</span>
+                            )}
+                            {first && kind !== "vacant" && (
                               <>
                                 <span className="w-full truncate">
                                   {first.studentName}

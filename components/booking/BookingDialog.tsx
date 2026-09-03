@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { StudentAutocomplete } from "@/components/students/StudentAutocomplete"
 import type { StudentSearchHit } from "@/actions/students"
+import { rememberMyRegistration } from "@/lib/my-registrations"
 import type { ActionResult } from "@/types"
 
 export function BookingDialog({
@@ -90,6 +91,9 @@ export function BookingDialog({
       "activeRegistration",
       JSON.stringify({ id: result.data.id, date: values.date, startTime: values.startTime, endTime: values.endTime })
     )
+    // Every booking, not just the latest — the calendar uses this to know
+    // which cards belong to this browser (lib/my-registrations.ts).
+    rememberMyRegistration(result.data.id)
     onOpenChange(false)
     onSuccess()
   }

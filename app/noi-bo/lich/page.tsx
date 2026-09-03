@@ -69,7 +69,8 @@ export default async function InternalCalendarPage({
           <InternalScheduleGridClient
             desks={schedule.desks} date={selectedDate} registrations={schedule.registrations} locks={schedule.locks}
             canBook
-            canCancel={profile.role === "admin"}
+            canCancel
+            branchName={branches.find((b) => b.id === activeBranchId)?.name}
             phoneByStudentId={phoneByStudentId}
           />
         ))}
