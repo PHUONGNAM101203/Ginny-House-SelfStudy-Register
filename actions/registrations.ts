@@ -12,6 +12,7 @@ import {
   adminCancelRegistrationSchema,
   requestChangeSchema,
   reviewChangeRequestSchema,
+  updateRegistrationDetailsSchema,
 } from "@/lib/validations/registration"
 import type { ActionResult } from "@/types"
 import { requireAdmin, requireProfile } from "@/lib/auth"
@@ -340,3 +341,36 @@ export async function reviewRegistrationChangeAction(input: unknown): Promise<Ac
   return { ok: true, data: null }
 }
 
+
+/**
+ * Sửa tên / lớp / SĐT ngay trên card, for admin and quản sinh.
+ *
+ * The RPC does the real work because the edit spans three tables — the
+ * booking's own snapshot, the student record, and any linked lịch cố định —
+ * and must not half-apply. Staff-wide, enforced there too via is_staff().
+ */
+export async function updateRegistrationDetailsAction(input: unknown): Promise<ActionResult<null>> {
+  await requireProfile()
+  const parsed = updateRegistrationDetailsSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = await createServerClient()
+  const { error } = await supabase.rpc("update_registration_details", {
+    p_registration_id: parsed.data.registrationId,
+    p_full_name: parsed.data.fullName,
+    p_phone: parsed.data.phone,
+    p_class_name: parsed.data.className ?? null,
+    p_zalo_contact: parsed.data.zaloContact ?? null,
+  })
+  // The RPC raises messages already written for a person to read, so they go
+  // straight through instead of being flattened into "có lỗi xảy ra".
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  revalidatePath("/")
+  refresh()
+  return { ok: true, data: null }
+}

@@ -65,3 +65,11 @@ export const reviewChangeRequestSchema = z.object({
   adminNote: z.string().trim().max(500, "Ghi chú quá dài").optional(),
 })
 export type ReviewChangeRequestInput = z.infer<typeof reviewChangeRequestSchema>
+
+export const updateRegistrationDetailsSchema = z.object({
+  registrationId: z.string().uuid("Lịch không hợp lệ"),
+  fullName: z.string().trim().min(2, "Tên quá ngắn").max(100, "Tên quá dài"),
+  phone: z.string().regex(phoneRegex, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),
+  className: z.string().trim().max(50, "Tên lớp quá dài").optional(),
+  zaloContact: z.string().trim().max(100, "Zalo quá dài").optional(),
+})

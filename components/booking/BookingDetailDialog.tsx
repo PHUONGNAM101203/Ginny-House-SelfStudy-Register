@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { AlertTriangleIcon } from "lucide-react"
-import { cancelRegistrationAsAdminAction } from "@/actions/registrations"
+import { AlertTriangleIcon, PencilIcon } from "lucide-react"
+import { cancelRegistrationAsAdminAction, updateRegistrationDetailsAction } from "@/actions/registrations"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { BOOKING_KIND_LABEL, bookingKind } from "@/lib/booking-kind"
 
 /**
@@ -69,6 +71,30 @@ export function BookingDetailDialog({
   const [submitting, setSubmitting] = useState(false)
   const kind = bookingKind({ studentId: studentName ? "x" : null, recurringRegistrationId })
 
+  // Staff fix a typo in the tên / lớp / SĐT here rather than having to cancel
+  // the booking and make it again.
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    fullName: studentName ?? "",
+    phone: phone ?? "",
+    className: className ?? "",
+  })
+
+  async function save() {
+    setSaving(true)
+    const result = await updateRegistrationDetailsAction({ registrationId, ...form })
+    setSaving(false)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    toast.success("Đã cập nhật thông tin")
+    setEditing(false)
+    onOpenChange(false)
+    onSuccess()
+  }
+
   async function cancelDirectly() {
     setSubmitting(true)
     const result = await cancelRegistrationAsAdminAction({ registrationId })
@@ -86,7 +112,23 @@ export function BookingDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Chi tiết lịch</DialogTitle>
+          {/* pr-8 clears DialogContent's own absolutely-positioned close
+              button (top-2 right-2) — without it the × sits on top of the
+              edit button and swallows the click. */}
+          <DialogTitle className="flex items-center justify-between gap-2 pr-8">
+            <span>{editing ? "Sửa thông tin lịch" : "Chi tiết lịch"}</span>
+            {audience === "staff" && !editing && studentName && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Sửa thông tin"
+                title="Sửa thông tin"
+                onClick={() => setEditing(true)}
+              >
+                <PencilIcon className="size-4" />
+              </Button>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         {audience === "guest-other" && (
@@ -98,6 +140,38 @@ export function BookingDetailDialog({
           </div>
         )}
 
+        {editing ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-reg-name">Họ tên</Label>
+              <Input
+                id="edit-reg-name"
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-reg-class">Lớp</Label>
+              <Input
+                id="edit-reg-class"
+                value={form.className}
+                placeholder="VD: L2-04-26"
+                onChange={(e) => setForm({ ...form, className: e.target.value })}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-reg-phone">Số điện thoại</Label>
+              <Input
+                id="edit-reg-phone"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sửa ở đây cập nhật cả hồ sơ học sinh và lịch cố định của bạn ấy (nếu có).
+            </p>
+          </div>
+        ) : (
         <div className="flex flex-col gap-2">
           <Row label="Học sinh" value={studentName ?? "—"} />
           {className && <Row label="Lớp" value={className} />}
@@ -108,8 +182,19 @@ export function BookingDetailDialog({
           <Row label="Giờ" value={`${startTime}-${endTime}`} />
           <Row label="Loại lịch" value={BOOKING_KIND_LABEL[kind]} />
         </div>
+        )}
 
-        {audience === "staff" && canCancel && (
+        {audience === "staff" && editing && (
+          <DialogFooter>
+            <Button type="button" disabled={saving} onClick={save}>
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => setEditing(false)}>
+              Huỷ bỏ
+            </Button>
+          </DialogFooter>
+        )}
+        {audience === "staff" && !editing && canCancel && (
           <DialogFooter>
             <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
               {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
