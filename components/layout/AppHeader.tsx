@@ -34,12 +34,16 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-1.5 border-b bg-background/80 px-2.5 py-3 backdrop-blur supports-backdrop-filter:bg-background/70 sm:gap-3 sm:px-6">
-      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 shrink-0 items-center gap-1.5 text-primary sm:gap-2">
+      {/* Both sides were shrink-0, so at 320px the header simply overflowed
+          and dragged the whole page into a horizontal scroll. The wordmark
+          gives way first (the mark itself never does), and the controls keep
+          their size — those are touch targets. */}
+      <Link href={profile ? "/noi-bo/lich" : "/"} className="flex min-w-0 items-center gap-1.5 py-1.5 text-primary sm:gap-2">
         <BrandMark className="size-6 shrink-0" priority />
-        <span className="text-base leading-none font-semibold tracking-tight sm:text-lg">Ginny House</span>
+        <span className="truncate text-base leading-none font-semibold tracking-tight sm:text-lg">Ginny House</span>
       </Link>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-3">
         <VietnamClock className="hidden sm:flex" />
 
         {profile && (
