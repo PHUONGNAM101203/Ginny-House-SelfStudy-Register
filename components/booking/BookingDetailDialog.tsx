@@ -112,23 +112,7 @@ export function BookingDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          {/* pr-8 clears DialogContent's own absolutely-positioned close
-              button (top-2 right-2) — without it the × sits on top of the
-              edit button and swallows the click. */}
-          <DialogTitle className="flex items-center justify-between gap-2 pr-8">
-            <span>{editing ? "Sửa thông tin lịch" : "Chi tiết lịch"}</span>
-            {audience === "staff" && !editing && studentName && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Sửa thông tin"
-                title="Sửa thông tin"
-                onClick={() => setEditing(true)}
-              >
-                <PencilIcon className="size-4" />
-              </Button>
-            )}
-          </DialogTitle>
+          <DialogTitle>{editing ? "Sửa thông tin lịch" : "Chi tiết lịch"}</DialogTitle>
         </DialogHeader>
 
         {audience === "guest-other" && (
@@ -194,7 +178,25 @@ export function BookingDetailDialog({
             </Button>
           </DialogFooter>
         )}
-        {audience === "staff" && !editing && canCancel && (
+        {/* Editing sits with the other actions rather than as an icon in the
+            title row. Up there it was 8px out of line with the dialog's own
+            absolutely-positioned close button, and once icon buttons gained
+            a finger-sized hit area on touch the two overlapped by 4px — so
+            tapping near the edge hit the wrong one. */}
+        {audience === "staff" && !editing && studentName && (
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+              <PencilIcon className="size-4" />
+              Sửa thông tin
+            </Button>
+            {canCancel && (
+              <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
+                {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
+              </Button>
+            )}
+          </DialogFooter>
+        )}
+        {audience === "staff" && !editing && !studentName && canCancel && (
           <DialogFooter>
             <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
               {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
