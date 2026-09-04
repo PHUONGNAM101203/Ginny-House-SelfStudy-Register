@@ -99,12 +99,19 @@ export default async function DashboardPage() {
   // already used by app/noi-bo/quan-ly/co-so, and sidesteps PostgREST's
   // embed-shape ambiguity (object vs single-element array) for a to-one
   // relation.
-  const recurringStudentIds = [...new Set((recurring ?? []).map((r) => r.student_id))]
+  // A vacated recurring rule has no student (migration 0034). Leaving the
+  // null in the list makes PostgREST reject the whole `.in()` filter, so the
+  // lookup returns nothing and every "chưa đăng ký" notice loses its phone.
+  // Those rules are dropped from the count entirely — there is nobody to chase.
+  const claimedRecurring = (recurring ?? []).filter(
+    (r): r is typeof r & { student_id: string; student_name: string } => r.student_id !== null
+  )
+  const recurringStudentIds = [...new Set(claimedRecurring.map((r) => r.student_id))]
   const { data: recurringStudents } = await supabase.from("students").select("id, phone").in("id", recurringStudentIds)
   const phoneByStudentId = new Map((recurringStudents ?? []).map((s) => [s.id, s.phone]))
 
   const missing = findMissingRegistrations(
-    (recurring ?? []).map((r) => ({
+    claimedRecurring.map((r) => ({
       studentId: r.student_id,
       studentName: r.student_name,
       phone: phoneByStudentId.get(r.student_id) ?? "",

@@ -37,6 +37,11 @@ export function BookingDialog({
 
   const phone = watch("phone")
   const fullName = watch("fullName") ?? ""
+  const watchedClass = watch("className") ?? ""
+  const hasAllDetails =
+    fullName.trim().length >= 2 &&
+    (phone ?? "").replace(/\D/g, "").length >= 9 &&
+    watchedClass.trim().length > 0
   const [suggestion, setSuggestion] = useState<StudentLookupResult | null>(null)
   const [dismissedSuggestion, setDismissedSuggestion] = useState(false)
 
@@ -156,7 +161,13 @@ export function BookingDialog({
             Đăng ký cố định (tự giữ chỗ mỗi tuần)
           </label>
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>{submitting ? "Đang đăng ký..." : "Xác nhận"}</Button>
+            {/* Tên, SĐT and lớp are all required. The schema enforces it on
+                submit; disabling the button says so before the click, which
+                matters most for a student not yet in the list, where nothing
+                gets auto-filled. */}
+            <Button type="submit" disabled={submitting || !hasAllDetails}>
+              {submitting ? "Đang đăng ký..." : "Xác nhận"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

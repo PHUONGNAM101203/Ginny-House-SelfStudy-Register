@@ -37,7 +37,9 @@ export const createRecurringScheduleSchema = z
     dayOfWeek: z.number().int().min(1, "Thứ không hợp lệ").max(7, "Thứ không hợp lệ"),
     startTime: z.string().regex(/^\d{2}:\d{2}$/, "Giờ bắt đầu không hợp lệ"),
     endTime: z.string().regex(/^\d{2}:\d{2}$/, "Giờ kết thúc không hợp lệ"),
-    className: z.string().trim().max(100, "Tên lớp quá dài").transform(normalizeClassName).optional(),
+    // Required, like the booking form: a lịch cố định with no lớp is the
+    // record nobody can act on later ("phải đầy đủ cả 3 trường").
+    className: z.string().trim().min(1, "Vui lòng nhập tên lớp").max(100, "Tên lớp quá dài").transform(normalizeClassName),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ").optional(),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ").optional(),
   })

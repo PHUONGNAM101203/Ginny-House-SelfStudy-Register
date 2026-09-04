@@ -43,7 +43,14 @@ export default async function InternalCalendarPage({
   let phoneByStudentId = new Map<string, string>()
   if (schedule) {
     const supabase = await createServerClient()
-    const studentIds = [...new Set(schedule.registrations.map((r) => r.studentId))]
+    // filter(Boolean) is load-bearing: a vacant placeholder has a null
+    // studentId, and PostgREST rejects the whole `.in()` filter with
+    // "invalid input syntax for type uuid" the moment one null is in the
+    // list. The query then returns nothing and EVERY card on that day loses
+    // its phone — which is what "đăng ký mà không có SĐT" actually was.
+    const studentIds = [...new Set(schedule.registrations.map((r) => r.studentId))].filter(
+      (id): id is string => id !== null
+    )
     if (studentIds.length > 0) {
       const { data: students } = await supabase.from("students").select("id, phone").in("id", studentIds)
       phoneByStudentId = new Map((students ?? []).map((s) => [s.id, s.phone]))

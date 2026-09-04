@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { DialogForm } from "@/components/ui/dialog-form"
+import { StudentAutocomplete } from "@/components/students/StudentAutocomplete"
 
 type Branch = { id: string; name: string }
 type Desk = { id: string; branch_id: string; label: string }
@@ -57,6 +58,11 @@ export function CreateRecurringScheduleDialog({ branches, desks }: { branches: B
     setBranchId(branches[0]?.id ?? "")
   }
 
+  const hasStudentDetails =
+    form.fullName.trim().length >= 2 &&
+    form.phone.replace(/\D/g, "").length >= 9 &&
+    form.className.trim().length > 0
+
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)} className="w-fit">
@@ -73,7 +79,23 @@ export function CreateRecurringScheduleDialog({ branches, desks }: { branches: B
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="rs-name">Họ tên học sinh</Label>
-                  <Input id="rs-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+                  <StudentAutocomplete
+                    id="rs-name"
+                    value={form.fullName}
+                    onValueChange={(v) => setForm((f) => ({ ...f, fullName: v }))}
+                    onSelect={(hit) =>
+                      setForm((f) => ({
+                        ...f,
+                        fullName: hit.fullName,
+                        // Only fill what the database actually returned:
+                        // overwriting a typed value with an empty one would
+                        // be worse than leaving it alone.
+                        phone: hit.phone ?? f.phone,
+                        className: hit.className ?? f.className,
+                      }))
+                    }
+                    placeholder="Gõ tên để chọn từ danh sách"
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="rs-phone">Số điện thoại</Label>
@@ -144,7 +166,13 @@ export function CreateRecurringScheduleDialog({ branches, desks }: { branches: B
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={submitting || !form.deskId}>{submitting ? "Đang tạo..." : "Tạo lịch cố định"}</Button>
+              {/* All three of tên / SĐT / lớp, not just the schema catching it
+                  on submit — a student who isn't in the list yet has nothing
+                  to auto-fill from, and a half-filled record is exactly what
+                  cannot be chased up later. */}
+              <Button type="submit" disabled={submitting || !form.deskId || !hasStudentDetails}>
+                {submitting ? "Đang tạo..." : "Tạo lịch cố định"}
+              </Button>
             </DialogFooter>
           </DialogForm>
         </DialogContent>
