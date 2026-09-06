@@ -49,16 +49,21 @@ function isoDayOfWeek(dateStr: string): number {
   return ((date.getUTCDay() + 6) % 7) + 1
 }
 
-function minutesOf(hm: string): number {
-  const [h, m] = hm.split(":").map(Number)
-  return h * 60 + m
-}
 
-// Returns every registration whose desk is open (not locked) for this
-// date/slot, alongside how many desks are open at all — matches ScheduleGrid's
-// own overlap check (start < slot.end && end > slot.start) so a cell here
-// agrees with what the day view would show for the same slot.
-function cellRegistrations(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slot: TimeSlot) {
+/**
+ * What belongs in one (day, slot) cell.
+ *
+ * `starting` is only the bookings that BEGIN in this slot; one that runs
+ * through from earlier is counted in `overlapping` but not drawn again. That
+ * is what keeps every booking on screen exactly once, at its real start time.
+ *
+ * The previous version merged the whole day column into one rowSpan card per
+ * slot, showing matches[0] and a "+N". It hid most of the day and misplaced
+ * the rest: on a real Saturday with 8 bookings it drew 3 cards, said "+1"
+ * while concealing six, and rendered a 14:30 booking on the 17:00 row because
+ * that was the first row the earlier card's span had not swallowed.
+ */
+function cellBookings(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slot: TimeSlot) {
   const isoDow = isoDayOfWeek(date)
   const availableDeskIds = new Set(
     desks
@@ -70,53 +75,16 @@ function cellRegistrations(desks: Desk[], registrations: Registration[], locks: 
       )
       .map((d) => d.id)
   )
-  const matches = registrations.filter(
+  // Same overlap test as ScheduleGrid, so a cell here agrees with the day view.
+  const overlapping = registrations.filter(
     (r) => availableDeskIds.has(r.deskId) && r.date === date && r.startTime < slot.end && r.endTime > slot.start
   )
-  return { totalDesks: availableDeskIds.size, matches }
-}
-
-type CellPlanEntry =
-  | { skip: true }
-  | { skip: false; rowSpan: number; totalDesks: number; matches: Registration[] }
-
-// A registration spanning several consecutive 30-minute slots used to repeat
-// its name on every row it covered (four rows all reading "Gin Anh" for a
-// 2-hour booking). This merges the slots it covers into one rowSpan cell —
-// a single card centered over the whole span — instead.
-//
-// The span is computed directly from the primary registration's own
-// `endTime` (ground truth), not by re-checking "is matches[0] still the same
-// id" slot by slot — that re-derivation was the actual bug: when a SECOND
-// registration on a different desk starts partway through the first one's
-// range, array ordering can make it sort before the first registration at
-// that later slot, so matches[0]'s identity "changes" even though the
-// original booking is still running — which silently cut the merged card
-// short and left the rest of that booking's own slots rendering as blank.
-// Reading the end time straight off the registration sidesteps that
-// entirely: the card always covers exactly what the booking says it does,
-// regardless of what else is happening in other desks at the same time.
-function computeColumnPlan(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slots: readonly TimeSlot[]): CellPlanEntry[] {
-  const plan: CellPlanEntry[] = []
-  let i = 0
-  while (i < slots.length) {
-    const { totalDesks, matches } = cellRegistrations(desks, registrations, locks, date, slots[i])
-    const primary = matches[0]
-    if (!primary) {
-      plan.push({ skip: false, rowSpan: 1, totalDesks, matches })
-      i++
-      continue
-    }
-    const endMinutes = minutesOf(primary.endTime)
-    let span = 1
-    while (i + span < slots.length && minutesOf(slots[i + span].start) < endMinutes) {
-      span++
-    }
-    plan.push({ skip: false, rowSpan: span, totalDesks, matches })
-    for (let k = 1; k < span; k++) plan.push({ skip: true })
-    i += span
-  }
-  return plan
+  const starting = overlapping
+    .filter((r) => r.startTime >= slot.start && r.startTime < slot.end)
+    // Sorted so the order is stable between renders rather than following
+    // whatever order the rows came back in.
+    .sort((a, b) => a.startTime.localeCompare(b.startTime) || (a.studentName ?? "").localeCompare(b.studentName ?? ""))
+  return { totalDesks: availableDeskIds.size, overlapping, starting }
 }
 
 /**
@@ -164,7 +132,6 @@ export function WeekOverview({
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {BLOCKS.map((block) => {
-        const columnPlans = weekDates.map((dateStr) => computeColumnPlan(desks, registrations, locks, dateStr, block.slots))
         return (
           <div key={block.label} className="min-w-0 overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[560px] border-collapse text-sm">
@@ -195,63 +162,82 @@ export function WeekOverview({
                 </tr>
               </thead>
               <tbody>
-                {block.slots.map((slot, slotIndex) => (
+                {block.slots.map((slot) => (
                   <tr key={slot.start}>
                     <td className="sticky left-0 border-b border-border bg-card p-1.5 text-xs text-muted-foreground tabular-nums">
                       {slot.start}
                     </td>
-                    {weekDates.map((dateStr, dayIndex) => {
-                      const cell = columnPlans[dayIndex][slotIndex]
-                      if (cell.skip) return null
-                      const { totalDesks, matches, rowSpan } = cell
-                      const first = matches[0]
-                      const kind = first ? bookingKind(first) : null
-                      const phone = first?.studentId ? phoneByStudentId?.get(first.studentId) : undefined
+                    {weekDates.map((dateStr) => {
+                      const { totalDesks, overlapping, starting } = cellBookings(desks, registrations, locks, dateStr, slot)
+                      const free = totalDesks - overlapping.length
                       const label =
                         totalDesks === 0
                           ? "Không có chỗ"
-                          : matches.length === 0
-                            ? "Còn trống"
-                            : kind === "vacant"
-                              ? BOOKING_KIND_LABEL.vacant
-                              : matches
-                                  .map((m) => (m.className ? `${m.studentName} · ${m.className}` : m.studentName))
-                                  .join(", ")
+                          : starting.length > 0
+                            ? starting
+                                .map(
+                                  (m) =>
+                                    `${m.startTime}–${m.endTime} ${m.studentName ?? BOOKING_KIND_LABEL.vacant} (${BOOKING_KIND_LABEL[bookingKind(m)]})`
+                                )
+                                .join(", ")
+                            : free > 0
+                              ? `Còn ${free} chỗ`
+                              : "Hết chỗ"
+                      const href = `?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`
                       return (
-                        <td key={dateStr} rowSpan={rowSpan} className="border-b border-l border-border p-0 align-middle">
+                        <td key={dateStr} className="border-b border-l border-border p-0 align-top">
                           <Link
-                            href={`?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`}
-                            // Same fixed light-tint chip look as the day view's
-                            // .rbc-event (app/globals.css) rather than a
-                            // density-scaled opacity — a saturated fill at high
-                            // occupancy would make the name unreadable.
+                            href={href}
                             className={cn(
-                              "flex h-full min-h-7 w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1 py-1 text-center text-[11px] leading-tight font-medium transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
+                              "flex h-full min-h-7 w-full flex-col gap-0.5 p-0.5 transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
                               // Same diagonal hatching as the day grid's locked
                               // slots (app/globals.css) — a plain muted fill was
                               // being read as bookable.
-                              totalDesks === 0 && "schedule-locked-hatch text-muted-foreground"
+                              totalDesks === 0 && "schedule-locked-hatch"
                             )}
-                            style={kind ? BOOKING_KIND_STYLE[kind] : undefined}
                             aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
                             title={label}
                           >
-                            {kind === "vacant" && (
-                              <span className="w-full truncate italic">{BOOKING_KIND_LABEL.vacant}</span>
-                            )}
-                            {first && kind !== "vacant" && (
-                              <>
-                                <span className="w-full truncate">
-                                  {first.studentName}
-                                  {first.className && ` · ${first.className}`}
+                            {starting.map((m) => {
+                              const kind = bookingKind(m)
+                              const phone = m.studentId ? phoneByStudentId?.get(m.studentId) : undefined
+                              return (
+                                <span
+                                  key={m.id}
+                                  className="flex w-full flex-col overflow-hidden rounded-sm px-1 py-0.5 text-[11px] leading-tight font-medium"
+                                  style={BOOKING_KIND_STYLE[kind]}
+                                >
+                                  <span className="w-full truncate tabular-nums opacity-70">
+                                    {/* en dash, matching how the day grid
+                                        renders its own time range */}
+                                    {m.startTime}–{m.endTime}
+                                  </span>
+                                  {kind === "vacant" ? (
+                                    <span className="w-full truncate italic">{BOOKING_KIND_LABEL.vacant}</span>
+                                  ) : (
+                                    <>
+                                      <span className="w-full truncate">
+                                        {m.studentName}
+                                        {m.className && ` · ${m.className}`}
+                                      </span>
+                                      {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
+                                      {/* The same kind line the day grid prints
+                                          under the name (ScheduleGrid's
+                                          EventContent). The tint alone is easy to
+                                          misread at this size, so a lịch cố định
+                                          says so in both views rather than only
+                                          in one. */}
+                                      <span className="w-full truncate text-[10px] font-normal opacity-70">{BOOKING_KIND_LABEL[kind]}</span>
+                                    </>
+                                  )}
                                 </span>
-                                {phone && <span className="w-full truncate text-[10px] font-normal opacity-80">{phone}</span>}
-                                <span className="w-full truncate text-[10px] font-normal opacity-70">
-                                  {kind && BOOKING_KIND_LABEL[kind]}
-                                </span>
-                              </>
+                              )
+                            })}
+                            {starting.length === 0 && (
+                              <span className="flex h-full min-h-6 w-full items-center justify-center text-[10px] text-muted-foreground">
+                                {totalDesks === 0 ? "Không có chỗ" : free > 0 ? `Còn ${free} chỗ` : "Hết chỗ"}
+                              </span>
                             )}
-                            {matches.length > 1 && <span className="shrink-0 text-[10px] font-normal opacity-80">+{matches.length - 1}</span>}
                           </Link>
                         </td>
                       )
