@@ -7,7 +7,7 @@ import { getWeekDates } from "@/lib/week"
 import { toYmd } from "@/lib/vn-date"
 import { ScheduleToolbar } from "@/components/schedule/ScheduleToolbar"
 import { InternalScheduleGridClient } from "@/components/schedule/InternalScheduleGridClient"
-import { WeekOverview } from "@/components/schedule/WeekOverview"
+import { InternalWeekOverviewClient } from "@/components/schedule/InternalWeekOverviewClient"
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend"
 import type { ScheduleView } from "@/components/schedule/ViewToggle"
 
@@ -64,13 +64,15 @@ export default async function InternalCalendarPage({
       <ScheduleLegend />
       {schedule &&
         (view === "week" ? (
-          <WeekOverview
+          <InternalWeekOverviewClient
             desks={schedule.desks}
             registrations={schedule.registrations}
             locks={schedule.locks}
             weekDates={getWeekDates(monday).map(toYmd)}
             branchId={activeBranchId}
+            branchName={branches.find((b) => b.id === activeBranchId)?.name}
             phoneByStudentId={phoneByStudentId}
+            canCancel
           />
         ) : (
           <InternalScheduleGridClient

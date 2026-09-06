@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { format } from "date-fns"
 import { vi } from "date-fns/locale"
@@ -21,6 +23,15 @@ type Registration = {
   status?: "active" | "cancelled"
 }
 type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
+
+/** What a chip hands back when clicked — the same shape ScheduleGrid's onSlotClick uses. */
+export type WeekBookingClick = {
+  desk: Desk
+  date: string
+  startTime: string
+  endTime: string
+  registration: Registration
+}
 
 // Same weekday abbreviations as DateNavigator's own strip, so the two read
 // as one navigation vocabulary rather than two different labelling schemes.
@@ -48,7 +59,6 @@ function isoDayOfWeek(dateStr: string): number {
   const date = new Date(`${dateStr}T00:00:00Z`)
   return ((date.getUTCDay() + 6) % 7) + 1
 }
-
 
 /**
  * What belongs in one (day, slot) cell.
@@ -89,13 +99,14 @@ function cellBookings(desks: Desk[], registrations: Registration[], locks: SlotL
 
 /**
  * Week-at-a-glance as an actual calendar grid — time down the left the same
- * way the single-day view reads, seven day columns across the top instead
- * of one, split into the same morning / afternoon–evening blocks. A booking
- * spanning multiple slots renders as one merged card (rowSpan) centered over
- * its whole time range — name, class, and (staff view only) phone — instead
- * of repeating the name on every row it covers. Each cell still links into
- * the single-day view for that date, so seeing every desk in a busy slot is
- * one click away.
+ * way the single-day view reads, seven day columns across the top instead of
+ * one, split into the same morning / afternoon–evening blocks. Every booking
+ * gets its own chip on the row where it starts, carrying its real time range,
+ * who it is for, which desk it holds, and which kind of lịch it is.
+ *
+ * Clicking a chip opens the same detail dialog the day view opens (via
+ * onBookingClick); clicking the rest of the cell still drops into the
+ * single-day view for that date.
  */
 export function WeekOverview({
   desks,
@@ -104,6 +115,7 @@ export function WeekOverview({
   weekDates,
   branchId,
   phoneByStudentId,
+  onBookingClick,
 }: {
   desks: Desk[]
   registrations: Registration[]
@@ -118,6 +130,11 @@ export function WeekOverview({
    * show one guest's phone number to another).
    */
   phoneByStudentId?: Map<string, string>
+  /**
+   * Omitted = chips are plain, unclickable text (the grid still works, it
+   * just has no detail dialog behind it). The two page wrappers supply it.
+   */
+  onBookingClick?: (payload: WeekBookingClick) => void
 }) {
   if (desks.length === 0) {
     return (
@@ -128,6 +145,9 @@ export function WeekOverview({
   }
 
   const todayStr = vietnamToday()
+  // Which desk a booking holds is the fact quản sinh needs most when reading
+  // the week — "đăng ký chỗ nào" — so every chip prints it.
+  const deskById = new Map(desks.map((d) => [d.id, d]))
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -177,7 +197,7 @@ export function WeekOverview({
                             ? starting
                                 .map(
                                   (m) =>
-                                    `${m.startTime}–${m.endTime} ${m.studentName ?? BOOKING_KIND_LABEL.vacant} (${BOOKING_KIND_LABEL[bookingKind(m)]})`
+                                    `${m.startTime}–${m.endTime} ${m.studentName ?? BOOKING_KIND_LABEL.vacant} · ${deskById.get(m.deskId)?.label ?? ""} (${BOOKING_KIND_LABEL[bookingKind(m)]})`
                                 )
                                 .join(", ")
                             : free > 0
@@ -185,11 +205,15 @@ export function WeekOverview({
                               : "Hết chỗ"
                       const href = `?${new URLSearchParams({ ...(branchId ? { branch: branchId } : {}), day: dateStr, view: "day" }).toString()}`
                       return (
-                        <td key={dateStr} className="border-b border-l border-border p-0 align-top">
+                        <td key={dateStr} className="relative border-b border-l border-border p-0 align-top">
+                          {/* The click-through to the single-day view sits
+                              *behind* the chips rather than wrapping them: a
+                              <button> inside an <a> is invalid, and the chips
+                              have their own job now (open the detail dialog). */}
                           <Link
                             href={href}
                             className={cn(
-                              "flex h-full min-h-7 w-full flex-col gap-0.5 p-0.5 transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
+                              "absolute inset-0 transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/50",
                               // Same diagonal hatching as the day grid's locked
                               // slots (app/globals.css) — a plain muted fill was
                               // being read as bookable.
@@ -197,14 +221,34 @@ export function WeekOverview({
                             )}
                             aria-label={`${format(parseYmd(dateStr), "EEEE dd/MM", { locale: vi })} ${slot.start}: ${label}`}
                             title={label}
-                          >
+                          />
+                          <div className="pointer-events-none relative flex min-h-7 w-full flex-col gap-0.5 p-0.5">
                             {starting.map((m) => {
                               const kind = bookingKind(m)
+                              const desk = deskById.get(m.deskId)
                               const phone = m.studentId ? phoneByStudentId?.get(m.studentId) : undefined
+                              const Chip = onBookingClick ? "button" : "span"
                               return (
-                                <span
+                                <Chip
                                   key={m.id}
-                                  className="flex w-full flex-col overflow-hidden rounded-sm px-1 py-0.5 text-[11px] leading-tight font-medium"
+                                  {...(onBookingClick
+                                    ? {
+                                        type: "button" as const,
+                                        onClick: () =>
+                                          desk &&
+                                          onBookingClick({
+                                            desk,
+                                            date: m.date,
+                                            startTime: m.startTime,
+                                            endTime: m.endTime,
+                                            registration: m,
+                                          }),
+                                      }
+                                    : {})}
+                                  className={cn(
+                                    "pointer-events-auto flex w-full flex-col overflow-hidden rounded-sm px-1 py-0.5 text-left text-[11px] leading-tight font-medium",
+                                    onBookingClick && "cursor-pointer transition-[outline] hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary/60"
+                                  )}
                                   style={BOOKING_KIND_STYLE[kind]}
                                 >
                                   <span className="w-full truncate tabular-nums opacity-70">
@@ -230,7 +274,12 @@ export function WeekOverview({
                                       <span className="w-full truncate text-[10px] font-normal opacity-70">{BOOKING_KIND_LABEL[kind]}</span>
                                     </>
                                   )}
-                                </span>
+                                  {/* Week view only: the day view already has a
+                                      desk column, this one doesn't, so without
+                                      this line the week says who is booked but
+                                      never which chỗ. */}
+                                  {desk && <span className="w-full truncate text-[10px] font-semibold">{desk.label}</span>}
+                                </Chip>
                               )
                             })}
                             {starting.length === 0 && (
@@ -238,7 +287,7 @@ export function WeekOverview({
                                 {totalDesks === 0 ? "Không có chỗ" : free > 0 ? `Còn ${free} chỗ` : "Hết chỗ"}
                               </span>
                             )}
-                          </Link>
+                          </div>
                         </td>
                       )
                     })}

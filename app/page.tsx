@@ -5,7 +5,7 @@ import { getWeekDates } from "@/lib/week"
 import { toYmd } from "@/lib/vn-date"
 import { ScheduleToolbar } from "@/components/schedule/ScheduleToolbar"
 import { ScheduleGridClient } from "@/components/schedule/ScheduleGridClient"
-import { WeekOverview } from "@/components/schedule/WeekOverview"
+import { WeekOverviewClient } from "@/components/schedule/WeekOverviewClient"
 import { AppHeader } from "@/components/layout/AppHeader"
 import type { ScheduleView } from "@/components/schedule/ViewToggle"
 
@@ -44,7 +44,7 @@ export default async function HomePage({
         <ScheduleToolbar branches={branches} activeBranchId={activeBranchId} selectedDate={selectedDate} monday={monday} view={view} />
         {schedule &&
           (view === "week" ? (
-            <WeekOverview
+            <WeekOverviewClient
               desks={schedule.desks}
               registrations={schedule.registrations}
               locks={schedule.locks}
