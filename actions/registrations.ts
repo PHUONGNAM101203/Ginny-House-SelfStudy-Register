@@ -270,6 +270,38 @@ export async function cancelRegistrationAsAdminAction(input: unknown): Promise<A
 }
 
 /**
+ * The other half of the cancel choice for a lịch cố định: stop the weekly
+ * rule and cancel this buổi along with every one after it.
+ *
+ * cancelRegistrationAsAdminAction above stays the per-occurrence path
+ * (migration 0038) — the dialog asks which one the staff member means rather
+ * than guessing, because guessing is what made whole schedules vanish from a
+ * single cancelled session.
+ */
+export async function cancelRecurringSeriesAction(input: unknown): Promise<ActionResult<{ cancelled: number }>> {
+  await requireProfile()
+  const parsed = adminCancelRegistrationSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" }
+  }
+
+  const supabase = await createServerClient()
+  const { data, error } = await supabase.rpc("cancel_recurring_series", {
+    p_registration_id: parsed.data.registrationId,
+  })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/noi-bo/lich")
+  revalidatePath("/noi-bo/quan-ly/hoc-sinh")
+  revalidatePath("/noi-bo/dashboard")
+  revalidatePath("/")
+  // Same reason as the per-occurrence cancel: invoked from onClick, not a
+  // <form action>, so revalidatePath alone leaves the caller's page stale.
+  refresh()
+  return { ok: true, data: { cancelled: typeof data === "number" ? data : 0 } }
+}
+
+/**
  * A guest's "phiếu xin xoá + đổi lịch" — lower-friction than the direct
  * self-cancel path (no exact name/phone match against the original booking),
  * queued for admin review instead of taking effect immediately.

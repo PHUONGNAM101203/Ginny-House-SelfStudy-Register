@@ -3,7 +3,11 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { AlertTriangleIcon, PencilIcon, PlusIcon } from "lucide-react"
-import { cancelRegistrationAsAdminAction, updateRegistrationDetailsAction } from "@/actions/registrations"
+import {
+  cancelRecurringSeriesAction,
+  cancelRegistrationAsAdminAction,
+  updateRegistrationDetailsAction,
+} from "@/actions/registrations"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -85,6 +89,11 @@ export function BookingDetailDialog({
 }) {
   const [submitting, setSubmitting] = useState(false)
   const cancelled = status === "cancelled"
+  // Huỷ on a lịch cố định is two different actions wearing one word, so it
+  // asks instead of choosing. A plain booking has only one meaning and goes
+  // straight through.
+  const [choosingScope, setChoosingScope] = useState(false)
+  const isRecurring = recurringRegistrationId !== null
   const kind = bookingKind({ status, studentId: studentName ? "x" : null, recurringRegistrationId })
 
   // Staff fix a typo in the tên / lớp / SĐT here rather than having to cancel
@@ -120,6 +129,19 @@ export function BookingDetailDialog({
       return
     }
     toast.success("Đã huỷ đăng ký")
+    onOpenChange(false)
+    onSuccess()
+  }
+
+  async function cancelWholeSeries() {
+    setSubmitting(true)
+    const result = await cancelRecurringSeriesAction({ registrationId })
+    setSubmitting(false)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    toast.success(`Đã huỷ lịch cố định (${result.data.cancelled} buổi)`)
     onOpenChange(false)
     onSuccess()
   }
@@ -214,24 +236,69 @@ export function BookingDetailDialog({
         {/* max-sm:flex-col overrides DialogFooter's flex-col-reverse: that
             default puts the LAST child on top, which on a phone stacked
             "Huỷ đăng ký" above "Sửa thông tin". */}
+        {/* Huỷ on a lịch cố định: which buổi did they mean? Cancelling one
+            session and ending the whole weekly schedule are both reasonable
+            readings of the same button, and until migration 0040 only one of
+            them existed on the calendar. */}
+        {audience === "staff" && !editing && !cancelled && choosingScope && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-sm font-medium">Huỷ lịch cố định này thế nào?</p>
+            <Button type="button" variant="outline" disabled={submitting} onClick={cancelDirectly}>
+              Chỉ huỷ buổi này ({date})
+            </Button>
+            <Button type="button" variant="destructive" disabled={submitting} onClick={cancelWholeSeries}>
+              Huỷ toàn bộ lịch cố định
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Huỷ toàn bộ sẽ dừng lịch cố định và huỷ buổi này cùng tất cả các buổi sau. Các buổi đã học trước đó vẫn
+              giữ nguyên.
+            </p>
+          </div>
+        )}
         {audience === "staff" && !editing && !cancelled && studentName && (
           <DialogFooter className="max-sm:flex-col">
-            <Button type="button" variant="outline" onClick={() => setEditing(true)}>
-              <PencilIcon className="size-4" />
-              Sửa thông tin
-            </Button>
-            {canCancel && (
-              <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
-                {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
+            {choosingScope ? (
+              <Button type="button" variant="outline" disabled={submitting} onClick={() => setChoosingScope(false)}>
+                Quay lại
               </Button>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+                  <PencilIcon className="size-4" />
+                  Sửa thông tin
+                </Button>
+                {canCancel && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={submitting}
+                    onClick={isRecurring ? () => setChoosingScope(true) : cancelDirectly}
+                  >
+                    {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
+                  </Button>
+                )}
+              </>
             )}
           </DialogFooter>
         )}
+        {/* A vacant placeholder belongs to a rule as much as a claimed buổi
+            does, so it gets the same question. */}
         {audience === "staff" && !editing && !cancelled && !studentName && canCancel && (
           <DialogFooter className="max-sm:flex-col">
-            <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
-              {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
-            </Button>
+            {choosingScope ? (
+              <Button type="button" variant="outline" disabled={submitting} onClick={() => setChoosingScope(false)}>
+                Quay lại
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={submitting}
+                onClick={isRecurring ? () => setChoosingScope(true) : cancelDirectly}
+              >
+                {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
+              </Button>
+            )}
           </DialogFooter>
         )}
         {audience === "guest-own" && !cancelled && (
