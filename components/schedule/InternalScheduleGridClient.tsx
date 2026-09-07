@@ -24,6 +24,18 @@ export function InternalScheduleGridClient({
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<SlotClickPayload | null>(null)
+  // Set from the cancelled-booking dialog's "Tạo chỗ mới": the slot that
+  // booking was holding is free again, so it hands straight over to the
+  // booking form for the same desk and half hour.
+  const [bookingOver, setBookingOver] = useState(false)
+
+  const cancelled = selected?.registration?.status === "cancelled"
+  const showBookingForm = selected && (!selected.registration || (cancelled && bookingOver))
+
+  function close() {
+    setSelected(null)
+    setBookingOver(false)
+  }
 
   return (
     <>
@@ -32,17 +44,20 @@ export function InternalScheduleGridClient({
         onSlotClick={canBook ? setSelected : () => {}}
         phoneByStudentId={phoneByStudentId}
       />
-      {canBook && selected && !selected.registration && (
+      {canBook && showBookingForm && (
         <BookingDialog
           open
-          onOpenChange={(v) => !v && setSelected(null)}
+          onOpenChange={(v) => !v && close()}
           deskId={selected.desk.id}
           deskLabel={selected.desk.label}
           date={selected.date}
           startTime={selected.startTime}
           endTime={selected.endTime}
           action={createRegistrationAsAdminAction}
-          onSuccess={() => router.refresh()}
+          onSuccess={() => {
+            close()
+            router.refresh()
+          }}
         />
       )}
       {/* Previously nothing rendered here at all — clicking an existing
@@ -53,10 +68,10 @@ export function InternalScheduleGridClient({
           gated, so a quản sinh can look up a phone without being able to
           cancel — until Gin Anh asked for staff cancels, which canCancel now
           carries. */}
-      {selected?.registration && (
+      {selected?.registration && !showBookingForm && (
         <BookingDetailDialog
           open
-          onOpenChange={(v) => !v && setSelected(null)}
+          onOpenChange={(v) => !v && close()}
           audience="staff"
           registrationId={selected.registration.id}
           deskLabel={selected.desk.label}
@@ -68,8 +83,10 @@ export function InternalScheduleGridClient({
           className={selected.registration.className}
           phone={selected.registration.studentId ? phoneByStudentId?.get(selected.registration.studentId) : null}
           recurringRegistrationId={selected.registration.recurringRegistrationId}
+          status={selected.registration.status}
           canCancel={canCancel}
           onSuccess={() => router.refresh()}
+          onCreateNew={canBook ? () => setBookingOver(true) : undefined}
         />
       )}
     </>

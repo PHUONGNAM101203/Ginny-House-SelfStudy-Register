@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { AlertTriangleIcon, PencilIcon } from "lucide-react"
+import { AlertTriangleIcon, PencilIcon, PlusIcon } from "lucide-react"
 import { cancelRegistrationAsAdminAction, updateRegistrationDetailsAction } from "@/actions/registrations"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -45,9 +45,11 @@ export function BookingDetailDialog({
   className,
   phone,
   recurringRegistrationId,
+  status = "active",
   canCancel = true,
   onSuccess,
   onRequestCancel,
+  onCreateNew,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -62,14 +64,28 @@ export function BookingDetailDialog({
   className: string | null
   phone?: string | null
   recurringRegistrationId: string | null
+  /**
+   * Without this a cancelled booking read as "Lịch bình thường" and still
+   * offered Sửa / Huỷ — editing a booking nobody holds, and cancelling one
+   * already cancelled.
+   */
+  status?: "active" | "cancelled"
   /** Staff only: false hides the huỷ button without changing anything else. */
   canCancel?: boolean
   onSuccess: () => void
   /** guest-own: hands over to the phiếu flow. */
   onRequestCancel?: () => void
+  /**
+   * Cancelled bookings only: the slot they were holding is free again, so
+   * staff get a way straight into the booking flow for it. Guests never see
+   * this dialog for a cancelled slot — their click opens the booking form
+   * directly (see ScheduleGridClient / WeekOverviewClient).
+   */
+  onCreateNew?: () => void
 }) {
   const [submitting, setSubmitting] = useState(false)
-  const kind = bookingKind({ studentId: studentName ? "x" : null, recurringRegistrationId })
+  const cancelled = status === "cancelled"
+  const kind = bookingKind({ status, studentId: studentName ? "x" : null, recurringRegistrationId })
 
   // Staff fix a typo in the tên / lớp / SĐT here rather than having to cancel
   // the booking and make it again.
@@ -169,7 +185,7 @@ export function BookingDetailDialog({
         )}
 
         {audience === "staff" && editing && (
-          <DialogFooter>
+          <DialogFooter className="max-sm:flex-col">
             <Button type="button" disabled={saving} onClick={save}>
               {saving ? "Đang lưu..." : "Lưu thay đổi"}
             </Button>
@@ -183,8 +199,23 @@ export function BookingDetailDialog({
             absolutely-positioned close button, and once icon buttons gained
             a finger-sized hit area on touch the two overlapped by 4px — so
             tapping near the edge hit the wrong one. */}
-        {audience === "staff" && !editing && studentName && (
-          <DialogFooter>
+        {/* A cancelled booking is a record, not a live one: nothing to edit
+            and nothing left to huỷ. What it does carry is a half hour that is
+            free again, which is what the day grid has always let staff click
+            into — this is that same action, made explicit. */}
+        {audience === "staff" && !editing && cancelled && onCreateNew && (
+          <DialogFooter className="max-sm:flex-col">
+            <Button type="button" onClick={onCreateNew}>
+              <PlusIcon className="size-4" />
+              Tạo chỗ mới
+            </Button>
+          </DialogFooter>
+        )}
+        {/* max-sm:flex-col overrides DialogFooter's flex-col-reverse: that
+            default puts the LAST child on top, which on a phone stacked
+            "Huỷ đăng ký" above "Sửa thông tin". */}
+        {audience === "staff" && !editing && !cancelled && studentName && (
+          <DialogFooter className="max-sm:flex-col">
             <Button type="button" variant="outline" onClick={() => setEditing(true)}>
               <PencilIcon className="size-4" />
               Sửa thông tin
@@ -196,14 +227,14 @@ export function BookingDetailDialog({
             )}
           </DialogFooter>
         )}
-        {audience === "staff" && !editing && !studentName && canCancel && (
-          <DialogFooter>
+        {audience === "staff" && !editing && !cancelled && !studentName && canCancel && (
+          <DialogFooter className="max-sm:flex-col">
             <Button type="button" variant="destructive" disabled={submitting} onClick={cancelDirectly}>
               {submitting ? "Đang huỷ..." : "Huỷ đăng ký"}
             </Button>
           </DialogFooter>
         )}
-        {audience === "guest-own" && (
+        {audience === "guest-own" && !cancelled && (
           <DialogFooter>
             <Button type="button" variant="destructive" onClick={onRequestCancel}>
               Gửi yêu cầu huỷ cho admin

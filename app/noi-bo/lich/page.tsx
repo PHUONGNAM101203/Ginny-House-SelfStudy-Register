@@ -72,6 +72,7 @@ export default async function InternalCalendarPage({
             branchId={activeBranchId}
             branchName={branches.find((b) => b.id === activeBranchId)?.name}
             phoneByStudentId={phoneByStudentId}
+            canBook
             canCancel
           />
         ) : (

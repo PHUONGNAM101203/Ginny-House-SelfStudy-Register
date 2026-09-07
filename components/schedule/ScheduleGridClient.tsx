@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { ScheduleGrid, type SlotClickPayload } from "@/components/schedule/ScheduleGrid"
 import { BookingDialog } from "@/components/booking/BookingDialog"
 import { BookingDetailDialog } from "@/components/booking/BookingDetailDialog"
@@ -39,10 +40,24 @@ export function ScheduleGridClient({
     setRequestingChange(false)
   }
 
+  function handleClick(payload: SlotClickPayload) {
+    // Someone else's live booking: none of it is a guest's business, and a
+    // dialog that only says "taken" is a dialog for nothing.
+    if (payload.registration && payload.registration.status !== "cancelled" && !myIds.has(payload.registration.id)) {
+      toast("Chỗ này đã có bạn khác đăng ký.")
+      return
+    }
+    setRequestingChange(false)
+    setSelected(payload)
+  }
+
   return (
     <>
-      <ScheduleGrid desks={desks} date={date} registrations={registrations} locks={locks} onSlotClick={setSelected} />
-      {selected && !selected.registration && (
+      <ScheduleGrid desks={desks} date={date} registrations={registrations} locks={locks} onSlotClick={handleClick} />
+      {/* A cancelled card is a free half hour still wearing a name, so for a
+          guest it opens the booking form — the same thing clicking empty grid
+          does, and the same thing the week view now does. */}
+      {selected && (!selected.registration || selected.registration.status === "cancelled") && (
         <BookingDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
@@ -62,11 +77,13 @@ export function ScheduleGridClient({
           }}
         />
       )}
-      {selected?.registration && !requestingChange && (
+      {/* Only ever this browser's own booking reaches here now — handleClick
+          turns anyone else's away before a dialog opens. */}
+      {selected?.registration && selected.registration.status !== "cancelled" && !requestingChange && (
         <BookingDetailDialog
           open
           onOpenChange={(v) => !v && setSelected(null)}
-          audience={myIds.has(selected.registration.id) ? "guest-own" : "guest-other"}
+          audience="guest-own"
           registrationId={selected.registration.id}
           deskLabel={selected.desk.label}
           date={selected.date}
@@ -75,11 +92,12 @@ export function ScheduleGridClient({
           studentName={selected.registration.studentName}
           className={selected.registration.className}
           recurringRegistrationId={selected.registration.recurringRegistrationId}
+          status={selected.registration.status}
           onSuccess={() => router.refresh()}
           onRequestCancel={() => setRequestingChange(true)}
         />
       )}
-      {selected?.registration && requestingChange && (
+      {selected?.registration && selected.registration.status !== "cancelled" && requestingChange && (
         <RequestChangeDialog
           open
           onOpenChange={(v) => !v && closeAll()}

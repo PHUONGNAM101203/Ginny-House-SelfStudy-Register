@@ -254,13 +254,15 @@ export function ScheduleGrid({
       date: dateStr,
       startTime: event.registration.startTime,
       endTime: event.registration.endTime,
-      // A cancelled card, or a vacant placeholder, means the half hour is
-      // available — clicking either opens the booking flow rather than a
-      // detail dialog for someone who isn't there.
-      registration:
-        event.registration.status === "cancelled" || event.registration.studentId === null
-          ? undefined
-          : event.registration,
+      // A vacant placeholder is nobody's booking — clicking it goes straight
+      // into the booking flow, same as clicking empty grid.
+      //
+      // A cancelled card used to do that too, which is why the day view
+      // opened "đặt chỗ" while the week view opened the details: the two
+      // views disagreed about the same card. It is passed through now, and
+      // each wrapper decides — staff see the details plus a way into the
+      // booking flow, a guest goes straight to booking.
+      registration: event.registration.studentId === null ? undefined : event.registration,
     })
   }
 
