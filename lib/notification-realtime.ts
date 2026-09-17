@@ -33,6 +33,12 @@ export function subscribeToNotifications(onUpdate: () => void): () => void {
 export async function broadcastNotificationsUpdate(): Promise<void> {
   const admin = createAdminClient()
   const channel = admin.channel(NOTIFICATIONS_CHANNEL)
-  await channel.send({ type: "broadcast", event: UPDATE_EVENT, payload: {} })
+  // httpSend, not send(): send() on a channel that was never subscribed
+  // silently falls back to REST and logs "Realtime send() is automatically
+  // falling back to REST API ... use httpSend() explicitly" on every single
+  // call, which is what was filling the Vercel function logs. REST is what
+  // this wants — there is no websocket in a server action to push down — so
+  // it now says so rather than being corrected about it.
+  await channel.httpSend(UPDATE_EVENT, {})
   admin.removeChannel(channel)
 }

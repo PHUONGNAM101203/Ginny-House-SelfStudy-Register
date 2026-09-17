@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { addDays } from "date-fns"
+import { getMondayOfWeek } from "@/lib/week"
+import { parseYmd, toYmd, vietnamToday } from "@/lib/vn-date"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321"
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
@@ -141,12 +144,22 @@ describe("materialize_recurring_registrations", () => {
   it("creates one registration per active recurring rule for the given week", async () => {
     // Recurring schedules apply immediately again — migration 0033 removed
     // the approval step that briefly gated this.
+    // Dates are computed, not hardcoded: migration 0037 refuses to
+    // materialize outside [current Monday, +56 days], so a fixed week here is
+    // a test that passes until that week falls into the past, then fails for
+    // a reason that has nothing to do with the code under test.
+    const currentMonday = getMondayOfWeek(parseYmd(vietnamToday()))
+    const nextMonday = addDays(currentMonday, 7)
+
     await supabase.rpc("create_registration", {
-      p_desk_id: deskId, p_date: "2026-08-31", p_start_time: "12:00", p_end_time: "12:30",
+      p_desk_id: deskId, p_date: toYmd(currentMonday), p_start_time: "12:00", p_end_time: "12:30",
       p_full_name: "Phạm D", p_phone: "0900000006", p_is_recurring: true, p_admin_created: false,
     })
+    // Next week, not this one: 0038's materialize skips any (rule, date) the
+    // rule has already produced, and the booking above just produced this
+    // Monday.
     const { data: count, error } = await supabase.rpc("materialize_recurring_registrations", {
-      p_week_start: "2026-09-07",
+      p_week_start: toYmd(nextMonday),
     })
     expect(error).toBeNull()
     expect(count).toBeGreaterThanOrEqual(1)

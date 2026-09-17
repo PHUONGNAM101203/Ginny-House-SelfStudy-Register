@@ -46,7 +46,11 @@ export function subscribeToChatChannel(sessionId: string, onMessage: (msg: ChatM
 export async function broadcastChatMessage(sessionId: string, message: ChatMessagePayload): Promise<void> {
   const supabase = createBrowserClient()
   const channel = supabase.channel(channelName(sessionId))
-  await channel.send({ type: "broadcast", event: CHANNEL_EVENT, payload: message })
+  // httpSend, not send(): this channel is never subscribed (the sender
+  // already has its own message — see ChatThread's onSend contract), so
+  // send() falls back to REST anyway and warns about it on every message.
+  // REST is the intent here, so it is stated outright.
+  await channel.httpSend(CHANNEL_EVENT, message)
   supabase.removeChannel(channel)
 }
 
@@ -73,6 +77,6 @@ export function subscribeToStaffInbox(onUpdate: () => void): () => void {
 export async function broadcastStaffInboxUpdate(): Promise<void> {
   const supabase = createBrowserClient()
   const channel = supabase.channel(STAFF_INBOX_CHANNEL)
-  await channel.send({ type: "broadcast", event: INBOX_EVENT, payload: {} })
+  await channel.httpSend(INBOX_EVENT, {})
   supabase.removeChannel(channel)
 }
