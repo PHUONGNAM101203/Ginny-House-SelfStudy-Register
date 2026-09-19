@@ -24,6 +24,11 @@ function minutesOf(time: string): number {
  * Runs on the service-role client because there is no signed-in user on a
  * cron invocation, so nothing would pass the notifications RLS policies.
  */
+// Fluid compute is off on this project, so Vercel's default function timeout
+// is 15s. This one counts a whole month across seven queries and then pushes
+// to every subscribed device, so it keeps its own headroom.
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
   // Fail closed: an unauthenticated writer of admin-visible notifications is
