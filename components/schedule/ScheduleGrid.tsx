@@ -4,6 +4,7 @@ import { Calendar, dateFnsLocalizer, type SlotInfo } from "react-big-calendar"
 import { format, startOfWeek, getDay, addMinutes, setHours, setMinutes } from "date-fns"
 import { vi } from "date-fns/locale"
 import type { Desk, RegistrationRow, SlotLock } from "@/lib/schedule-data"
+import { lockAppliesOn } from "@/lib/slot-locks"
 import { parseYmd } from "@/lib/vn-date"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 import { bookingKind, BOOKING_KIND_LABEL, BOOKING_KIND_STYLE } from "@/lib/booking-kind"
@@ -169,7 +170,6 @@ export function ScheduleGrid({
   // an instant, so it would render as the previous calendar day in any browser
   // west of the server's Asia/Ho_Chi_Minh (see lib/vn-date.ts).
   const date = parseYmd(dateStr)
-  const isoDow = ((date.getDay() + 6) % 7) + 1
 
   // Cancelled cards are shown for visibility only (Gin Anh: so quản sinh can
   // see who dropped out) — the slot itself is free, so as far as booking is
@@ -189,7 +189,14 @@ export function ScheduleGrid({
 
   function isLocked(deskId: string, startTime: string, endTime: string) {
     return locks.some(
-      (l) => (l.deskId === deskId || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < endTime && l.endTime > startTime
+      // lockAppliesOn, not a bare dayOfWeek comparison: a one-off lock has no
+      // weekday at all, and drawing it on every week would be a visible lie
+      // (see lib/slot-locks.ts and migration 0041).
+      (l) =>
+        (l.deskId === deskId || l.deskId === null) &&
+        lockAppliesOn(l, dateStr) &&
+        l.startTime < endTime &&
+        l.endTime > startTime
     )
   }
 

@@ -31,7 +31,20 @@ export type RegistrationRow = {
    */
   status: "active" | "cancelled"
 }
-export type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
+/**
+ * `dayOfWeek: null` = a one-off / date-range lock rather than a weekly one,
+ * and the two date bounds are what stop it repeating (migration 0041). Decide
+ * whether a lock covers a date with lib/slot-locks.ts's lockAppliesOn rather
+ * than comparing these fields by hand.
+ */
+export type SlotLock = {
+  deskId: string | null
+  dayOfWeek: number | null
+  startTime: string
+  endTime: string
+  effectiveFrom: string | null
+  effectiveTo: string | null
+}
 
 export async function getScheduleData(
   branchId: string,
@@ -59,7 +72,11 @@ export async function getScheduleData(
       // rather than silently truncating at PostgREST's default (which could render a booked slot
       // as free). TODO: replace with SQL-side aggregation (view/RPC) once data volume grows.
       .limit(10000),
-    supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("branch_id", branchId).eq("active", true),
+    supabase
+      .from("slot_locks")
+      .select("desk_id, day_of_week, start_time, end_time, effective_from, effective_to")
+      .eq("branch_id", branchId)
+      .eq("active", true),
   ])
 
 
@@ -96,6 +113,8 @@ export async function getScheduleData(
       dayOfWeek: l.day_of_week,
       startTime: toHm(l.start_time),
       endTime: toHm(l.end_time),
+      effectiveFrom: l.effective_from,
+      effectiveTo: l.effective_to,
     })) as SlotLock[],
   }
 }

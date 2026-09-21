@@ -7,6 +7,7 @@ import { TIME_SLOTS, type TimeSlot } from "@/lib/time-slots"
 import { parseYmd, vietnamToday } from "@/lib/vn-date"
 import { cn } from "@/lib/utils"
 import { bookingKind, BOOKING_KIND_LABEL, BOOKING_KIND_STYLE } from "@/lib/booking-kind"
+import { lockAppliesOn } from "@/lib/slot-locks"
 
 type Desk = { id: string; label: string }
 type Registration = {
@@ -22,7 +23,14 @@ type Registration = {
   /** Cancelled bookings reach this component on internal pages only. */
   status?: "active" | "cancelled"
 }
-type SlotLock = { deskId: string | null; dayOfWeek: number; startTime: string; endTime: string }
+type SlotLock = {
+  deskId: string | null
+  dayOfWeek: number | null
+  startTime: string
+  endTime: string
+  effectiveFrom: string | null
+  effectiveTo: string | null
+}
 
 /** What a chip hands back when clicked — the same shape ScheduleGrid's onSlotClick uses. */
 export type WeekBookingClick = {
@@ -55,10 +63,6 @@ const BLOCKS = [
   { label: "Buổi chiều – tối", end: "22:00", slots: TIME_SLOTS.filter((s) => s.start >= "14:00") },
 ] as const
 
-function isoDayOfWeek(dateStr: string): number {
-  const date = new Date(`${dateStr}T00:00:00Z`)
-  return ((date.getUTCDay() + 6) % 7) + 1
-}
 
 /**
  * What belongs in one (day, slot) cell.
@@ -74,13 +78,19 @@ function isoDayOfWeek(dateStr: string): number {
  * that was the first row the earlier card's span had not swallowed.
  */
 function cellBookings(desks: Desk[], registrations: Registration[], locks: SlotLock[], date: string, slot: TimeSlot) {
-  const isoDow = isoDayOfWeek(date)
   const availableDeskIds = new Set(
     desks
       .filter(
         (d) =>
           !locks.some(
-            (l) => (l.deskId === d.id || l.deskId === null) && l.dayOfWeek === isoDow && l.startTime < slot.end && l.endTime > slot.start
+            // lockAppliesOn, not a bare dayOfWeek comparison: a one-off lock
+            // has no weekday, and repeating it across the week grid would be
+            // a visible lie (see lib/slot-locks.ts and migration 0041).
+            (l) =>
+              (l.deskId === d.id || l.deskId === null) &&
+              lockAppliesOn(l, date) &&
+              l.startTime < slot.end &&
+              l.endTime > slot.start
           )
       )
       .map((d) => d.id)

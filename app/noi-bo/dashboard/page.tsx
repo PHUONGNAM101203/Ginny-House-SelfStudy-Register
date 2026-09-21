@@ -89,7 +89,14 @@ export default async function DashboardPage() {
     // there were, which is a number the old "active only" query could never
     // produce. Everything that must ignore them filters on status itself.
     supabase.from("registrations").select("student_id, student_name, branch_id, desk_id, date, start_time, end_time, status, recurring_registration_id").gte("date", eightWeeksAgo).limit(10000),
-    supabase.from("slot_locks").select("desk_id, day_of_week, start_time, end_time").eq("active", true),
+    // effective_to is what lets a one-off lock expire on its own (migration
+    // 0041); without it in the filter this count keeps climbing with locks
+    // that stopped applying weeks ago.
+    supabase
+      .from("slot_locks")
+      .select("desk_id, day_of_week, start_time, end_time, effective_to")
+      .eq("active", true)
+      .or(`effective_to.is.null,effective_to.gte.${vietnamToday()}`),
     supabase.from("recurring_registrations").select("student_id, student_name, class_name, day_of_week, active").eq("active", true),
     supabase.from("branches").select("id, name"),
     supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true),

@@ -4,7 +4,9 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { PlusIcon } from "lucide-react"
 import { createSlotLockAction } from "@/actions/slot-locks"
-import { DAY_LABELS } from "@/lib/validations/slot-lock"
+import { DAY_LABELS, type SlotLockMode } from "@/lib/validations/slot-lock"
+import { describeLockScope } from "@/lib/slot-locks"
+import { vietnamToday } from "@/lib/vn-date"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,19 +17,58 @@ import { DialogForm } from "@/components/ui/dialog-form"
 type Branch = { id: string; name: string }
 type Desk = { id: string; branch_id: string; label: string }
 
+const MODE_LABELS: Record<SlotLockMode, string> = {
+  date: "Một ngày cụ thể",
+  range: "Một khoảng ngày",
+  weekly: "Lặp lại hằng tuần",
+}
+
+function emptyForm(branchId: string) {
+  const today = vietnamToday()
+  return {
+    branchId,
+    deskId: "",
+    // Mặc định khoá một ngày — việc hay gặp nhất (thi thử, mất điện, sự
+    // kiện). Khoá lặp lại mãi là lựa chọn nặng hơn nhiều nên phải chọn rõ.
+    mode: "date" as SlotLockMode,
+    date: today,
+    from: today,
+    to: today,
+    dayOfWeek: 1,
+    startTime: "08:00",
+    endTime: "12:00",
+    reason: "",
+  }
+}
+
 export function SlotLockForm({ branches, desks }: { branches: Branch[]; desks: Desk[] }) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState({
-    branchId: branches[0]?.id ?? "", deskId: "", dayOfWeek: 1, startTime: "08:00", endTime: "12:00", reason: "",
-  })
+  const [form, setForm] = useState(() => emptyForm(branches[0]?.id ?? ""))
+
+  // The same sentence the table will show for this lock once it exists, so
+  // what you are about to create is spelled out before you create it.
+  const preview = describeLockScope(
+    form.mode === "weekly"
+      ? { dayOfWeek: form.dayOfWeek, effectiveFrom: null, effectiveTo: null }
+      : form.mode === "date"
+        ? { dayOfWeek: null, effectiveFrom: form.date, effectiveTo: form.date }
+        : { dayOfWeek: null, effectiveFrom: form.from, effectiveTo: form.to }
+  )
 
   async function submit() {
     setSubmitting(true)
+    const scope =
+      form.mode === "weekly"
+        ? { mode: "weekly" as const, dayOfWeek: form.dayOfWeek }
+        : form.mode === "date"
+          ? { mode: "date" as const, date: form.date }
+          : { mode: "range" as const, from: form.from, to: form.to }
+
     const result = await createSlotLockAction({
       branchId: form.branchId,
       deskId: form.deskId || null,
-      dayOfWeek: form.dayOfWeek,
+      ...scope,
       startTime: form.startTime,
       endTime: form.endTime,
       reason: form.reason || undefined,
@@ -36,7 +77,7 @@ export function SlotLockForm({ branches, desks }: { branches: Branch[]; desks: D
     if (!result.ok) return toast.error(result.error)
     toast.success("Đã khoá lịch")
     setOpen(false)
-    setForm({ branchId: branches[0]?.id ?? "", deskId: "", dayOfWeek: 1, startTime: "08:00", endTime: "12:00", reason: "" })
+    setForm(emptyForm(branches[0]?.id ?? ""))
   }
 
   const branchDesks = desks.filter((d) => d.branch_id === form.branchId)
@@ -75,18 +116,53 @@ export function SlotLockForm({ branches, desks }: { branches: Branch[]; desks: D
                   ))}
                 </NativeSelect>
               </div>
+
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="lock-day">Thứ</Label>
+                <Label htmlFor="lock-mode">Khoá khi nào</Label>
                 <NativeSelect
-                  id="lock-day"
-                  value={form.dayOfWeek}
-                  onChange={(e) => setForm({ ...form, dayOfWeek: Number(e.target.value) })}
+                  id="lock-mode"
+                  value={form.mode}
+                  onChange={(e) => setForm({ ...form, mode: e.target.value as SlotLockMode })}
                 >
-                  {Object.entries(DAY_LABELS).map(([v, label]) => (
-                    <option key={v} value={v}>{label}</option>
+                  {(Object.keys(MODE_LABELS) as SlotLockMode[]).map((m) => (
+                    <option key={m} value={m}>{MODE_LABELS[m]}</option>
                   ))}
                 </NativeSelect>
               </div>
+
+              {form.mode === "date" && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="lock-date">Ngày</Label>
+                  <Input id="lock-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                </div>
+              )}
+              {form.mode === "range" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="lock-from">Từ ngày</Label>
+                    <Input id="lock-from" type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="lock-to">Đến ngày</Label>
+                    <Input id="lock-to" type="date" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} />
+                  </div>
+                </div>
+              )}
+              {form.mode === "weekly" && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="lock-day">Thứ</Label>
+                  <NativeSelect
+                    id="lock-day"
+                    value={form.dayOfWeek}
+                    onChange={(e) => setForm({ ...form, dayOfWeek: Number(e.target.value) })}
+                  >
+                    {Object.entries(DAY_LABELS).map(([v, label]) => (
+                      <option key={v} value={v}>{label}</option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="lock-start">Giờ bắt đầu</Label>
@@ -99,8 +175,13 @@ export function SlotLockForm({ branches, desks }: { branches: Branch[]; desks: D
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="lock-reason">Lý do (tuỳ chọn)</Label>
-                <Input id="lock-reason" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+                <Input id="lock-reason" placeholder="VD: thi thử" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
               </div>
+
+              <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                Sẽ khoá: <span className="font-medium text-foreground">{preview}</span>, {form.startTime}–{form.endTime}
+                {form.mode === "weekly" && " — cho đến khi gỡ"}
+              </p>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={submitting}>{submitting ? "Đang khoá..." : "Khoá"}</Button>
