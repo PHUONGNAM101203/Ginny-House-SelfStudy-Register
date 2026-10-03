@@ -94,7 +94,7 @@ export function ScheduleGridClient({
           recurringRegistrationId={selected.registration.recurringRegistrationId}
           status={selected.registration.status}
           onSuccess={() => router.refresh()}
-          onRequestCancel={() => setRequestingChange(true)}
+          onRequestReschedule={() => setRequestingChange(true)}
         />
       )}
       {selected?.registration && selected.registration.status !== "cancelled" && requestingChange && (

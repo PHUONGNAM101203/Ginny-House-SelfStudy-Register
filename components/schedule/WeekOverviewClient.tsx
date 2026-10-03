@@ -105,7 +105,7 @@ export function WeekOverviewClient({
           recurringRegistrationId={selected.registration.recurringRegistrationId}
           status={selected.registration.status}
           onSuccess={() => router.refresh()}
-          onRequestCancel={() => setRequestingChange(true)}
+          onRequestReschedule={() => setRequestingChange(true)}
         />
       )}
       {selected && !cancelled && requestingChange && (

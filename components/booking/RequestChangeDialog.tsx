@@ -52,7 +52,7 @@ export function RequestChangeDialog({
   const [submitting, setSubmitting] = useState(false)
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<RequestChangeInput>({
     resolver: zodResolver(requestChangeSchema),
-    defaultValues: { registrationId, kind: "cancel", requestedByName: "", requestedByPhone: "", reason: "" },
+    defaultValues: { registrationId, kind: "reschedule", requestedByName: "", requestedByPhone: "", reason: "" },
   })
   const kind = watch("kind")
 
@@ -114,26 +114,18 @@ export function RequestChangeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Gửi yêu cầu — {deskLabel} · {startTime}-{endTime}</DialogTitle>
+          <DialogTitle>Xin đổi sang giờ khác — {deskLabel} · {startTime}-{endTime}</DialogTitle>
           <DialogDescription>
             {studentName}
             {className ? ` · Lớp ${className}` : ""}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Yêu cầu</Label>
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-1.5">
-                <input type="radio" value="cancel" className="accent-[var(--primary)]" {...register("kind")} />
-                Xin huỷ
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input type="radio" value="reschedule" className="accent-[var(--primary)]" {...register("kind")} />
-                Xin đổi lịch
-              </label>
-            </div>
-          </div>
+          {/* Không còn ô chọn "Xin huỷ": huỷ giờ bấm thẳng trong Chi tiết lịch
+              và có hiệu lực ngay (migration 0042). Để hai đường huỷ song song
+              — một cái huỷ luôn, một cái xin phép — chỉ làm học sinh phân vân
+              và phiếu lại đọng như cũ. Phiếu giờ chỉ còn một việc. */}
+          <input type="hidden" value="reschedule" {...register("kind")} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="requestedByName">Họ tên</Label>
             <Input id="requestedByName" {...register("requestedByName")} />

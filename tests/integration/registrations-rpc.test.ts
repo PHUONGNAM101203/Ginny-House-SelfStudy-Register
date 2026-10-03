@@ -46,10 +46,10 @@ describe("create_registration", () => {
 })
 
 describe("cancel_registration", () => {
-  // Since migration 0031 a guest cannot cancel at all — every huỷ goes
-  // through admin review. The name/phone tests these replace asserted the
-  // old self-cancel, which no longer exists in any form.
-  it("refuses a guest cancellation with GH001, even with the right name and phone", async () => {
+  // Migration 0042 took the admin approval step back out: phiếu huỷ were
+  // piling up unactioned while the slot stayed blocked, so a student who
+  // gives the name and phone on the booking cancels it there and then.
+  it("lets a guest cancel their own booking when the name and phone match", async () => {
     const { data: reg } = await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-26", p_start_time: "10:00", p_end_time: "10:30",
       p_full_name: "Trần Thị B", p_phone: "0900000004", p_is_recurring: false, p_admin_created: false,
@@ -57,13 +57,10 @@ describe("cancel_registration", () => {
     const { error } = await supabase.rpc("cancel_registration", {
       p_registration_id: reg.id, p_full_name: "Trần Thị B", p_phone: "0900000004",
     })
-    expect(error).not.toBeNull()
-    // The UI keys on this code to steer the guest into the phiếu flow, so it
-    // is part of the contract rather than an arbitrary failure.
-    expect(error?.code).toBe("GH001")
+    expect(error).toBeNull()
   })
 
-  it("leaves the booking active when a guest tries to cancel it", async () => {
+  it("keeps the cancelled booking on record so quản sinh still sees it", async () => {
     const { data: reg } = await supabase.rpc("create_registration", {
       p_desk_id: deskId, p_date: "2026-08-27", p_start_time: "11:00", p_end_time: "11:30",
       p_full_name: "Lê Văn C", p_phone: "0900000005", p_is_recurring: false, p_admin_created: false,
@@ -76,7 +73,21 @@ describe("cancel_registration", () => {
       .select("status")
       .eq("id", reg.id)
       .single()
-    expect(after?.status).toBe("active")
+    // 'cancelled', not deleted: the grey "Lịch huỷ" card on the internal
+    // calendar is read from this row.
+    expect(after?.status).toBe("cancelled")
+  })
+
+  it("accepts the name without accents or matching case", async () => {
+    const { data: reg } = await supabase.rpc("create_registration", {
+      p_desk_id: deskId, p_date: "2026-08-28", p_start_time: "11:00", p_end_time: "11:30",
+      p_full_name: "Đặng Vũ Mai Phương", p_phone: "0900000007", p_is_recurring: false, p_admin_created: false,
+    })
+    const { error } = await supabase.rpc("cancel_registration", {
+      p_registration_id: reg.id, p_full_name: "dang vu mai phuong", p_phone: "0900000007",
+    })
+    // Demanding the right accents would just swap one barrier for another.
+    expect(error).toBeNull()
   })
 
   it("refuses a guest cancellation on a wrong name or phone too", async () => {

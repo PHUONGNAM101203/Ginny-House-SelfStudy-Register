@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { AlertTriangleIcon, PencilIcon, PlusIcon } from "lucide-react"
 import {
   cancelRecurringSeriesAction,
+  cancelRegistrationAction,
   cancelRegistrationAsAdminAction,
   updateRegistrationDetailsAction,
 } from "@/actions/registrations"
@@ -52,7 +53,7 @@ export function BookingDetailDialog({
   status = "active",
   canCancel = true,
   onSuccess,
-  onRequestCancel,
+  onRequestReschedule,
   onCreateNew,
 }: {
   open: boolean
@@ -77,8 +78,11 @@ export function BookingDetailDialog({
   /** Staff only: false hides the huỷ button without changing anything else. */
   canCancel?: boolean
   onSuccess: () => void
-  /** guest-own: hands over to the phiếu flow. */
-  onRequestCancel?: () => void
+  /**
+   * guest-own: hands over to the phiếu flow — now only for "xin đổi sang giờ
+   * khác". Huỷ không còn đi qua phiếu nữa (migration 0042).
+   */
+  onRequestReschedule?: () => void
   /**
    * Cancelled bookings only: the slot they were holding is free again, so
    * staff get a way straight into the booking flow for it. Guests never see
@@ -94,6 +98,11 @@ export function BookingDetailDialog({
   // straight through.
   const [choosingScope, setChoosingScope] = useState(false)
   const isRecurring = recurringRegistrationId !== null
+
+  // guest-own: bước xác nhận trước khi huỷ, thu đúng hai trường máy chủ đối
+  // chiếu được với lịch.
+  const [confirmingGuestCancel, setConfirmingGuestCancel] = useState(false)
+  const [guestForm, setGuestForm] = useState({ fullName: studentName ?? "", phone: "" })
   const kind = bookingKind({ status, studentId: studentName ? "x" : null, recurringRegistrationId })
 
   // Staff fix a typo in the tên / lớp / SĐT here rather than having to cancel
@@ -129,6 +138,26 @@ export function BookingDetailDialog({
       return
     }
     toast.success("Đã huỷ đăng ký")
+    onOpenChange(false)
+    onSuccess()
+  }
+
+  // Học sinh tự huỷ, không qua ai duyệt (migration 0042). Tên và SĐT là thứ
+  // duy nhất máy chủ kiểm chứng được rằng người bấm huỷ là người đã đặt —
+  // localStorage của trình duyệt thì không thể tin.
+  async function cancelAsGuest() {
+    setSubmitting(true)
+    const result = await cancelRegistrationAction({
+      registrationId,
+      fullName: guestForm.fullName,
+      phone: guestForm.phone,
+    })
+    setSubmitting(false)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    toast.success("Đã huỷ lịch")
     onOpenChange(false)
     onSuccess()
   }
@@ -301,11 +330,58 @@ export function BookingDetailDialog({
             )}
           </DialogFooter>
         )}
+        {/* Huỷ không còn phải chờ admin duyệt — phiếu huỷ đọng lại hàng loạt
+            mà chỗ thì vẫn bị giữ, nên bỏ hẳn bước đó. Vẫn hỏi lại tên và SĐT
+            vì đó là thứ duy nhất máy chủ đối chiếu được với chính lịch này. */}
+        {audience === "guest-own" && !cancelled && confirmingGuestCancel && (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-sm font-medium">Xác nhận huỷ lịch này</p>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="guest-cancel-name">Họ tên đã đăng ký</Label>
+              <Input
+                id="guest-cancel-name"
+                value={guestForm.fullName}
+                onChange={(e) => setGuestForm({ ...guestForm, fullName: e.target.value })}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="guest-cancel-phone">Số điện thoại đã đăng ký</Label>
+              <Input
+                id="guest-cancel-phone"
+                inputMode="numeric"
+                placeholder="VD: 0912345678"
+                value={guestForm.phone}
+                onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Huỷ xong chỗ này mở lại ngay cho bạn khác đăng ký.</p>
+          </div>
+        )}
         {audience === "guest-own" && !cancelled && (
-          <DialogFooter>
-            <Button type="button" variant="destructive" onClick={onRequestCancel}>
-              Gửi yêu cầu huỷ cho admin
-            </Button>
+          <DialogFooter className="max-sm:flex-col">
+            {confirmingGuestCancel ? (
+              <>
+                <Button type="button" variant="outline" disabled={submitting} onClick={() => setConfirmingGuestCancel(false)}>
+                  Quay lại
+                </Button>
+                <Button type="button" variant="destructive" disabled={submitting} onClick={cancelAsGuest}>
+                  {submitting ? "Đang huỷ..." : "Xác nhận huỷ"}
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Đổi sang giờ khác vẫn là phiếu: nó cần người sắp xếp, và
+                    khác hẳn việc bỏ buổi học. */}
+                {onRequestReschedule && (
+                  <Button type="button" variant="outline" onClick={onRequestReschedule}>
+                    Xin đổi sang giờ khác
+                  </Button>
+                )}
+                <Button type="button" variant="destructive" onClick={() => setConfirmingGuestCancel(true)}>
+                  Huỷ lịch
+                </Button>
+              </>
+            )}
           </DialogFooter>
         )}
       </DialogContent>
